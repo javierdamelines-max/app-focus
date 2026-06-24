@@ -18,7 +18,7 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght=300;400;500;600;700;800&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
     body { font-family: 'Plus Jakarta Sans', sans-serif; }
     .app-container { max-width: 480px; min-height: 850px; }
     .no-scrollbar::-webkit-scrollbar { display: none; }
@@ -93,7 +93,7 @@
               </div>
               <div class="flex items-center gap-3">
                 <span class="text-sm font-mono font-bold text-slate-300" id="timer-display-default">00:00:03</span>
-                <button id="btn-timer-default" onclick="toggleTimer('default')" class="bg-teal-500 hover:bg-teal-400 text-slate-950 font-bold px-4 py-1.5 rounded-xl text-xs flex items-center gap-1 transition">
+                <button id="btn-timer-default" onclick="toggleTimer('default')" class="bg-teal-500 hover:bg-teal-400 text-slate-950 font-bold px-4 py-1.5 rounded-xl text-xs flex items-center gap-1">
                   <i class="fa-solid fa-play text-[10px]"></i> Inici
                 </button>
               </div>
@@ -133,7 +133,7 @@
   </div>
 
   <script>
-    const tasks = { default: { id: 'default', title: 'Fer esport', desc: 'Gym habitual de tarda', tag: 'Salut', time: '19:00', date: new Date().toISOString().split('T')[0], seconds: 3, running: false, timerInterval: null, completed: false } };
+    const tasks = { default: { id: 'default', title: 'Fer esport', desc: 'Gym habitual de tarda', tag: 'Salut', time: '19:00', date: new Date().toISOString().split('T')[0], seconds: 3, running: false, completed: false, timerInterval: null } };
 
     function updateClock() {
       const now = new Date();
@@ -160,11 +160,11 @@
       if (task.running) {
         clearInterval(task.timerInterval);
         task.running = false;
-        if (btn) { btn.innerHTML = '<i class="fa-solid fa-play text-[10px]"></i> Inici'; btn.className = 'bg-teal-500 hover:bg-teal-400 text-slate-950 font-bold px-4 py-1.5 rounded-xl text-xs flex items-center gap-1 transition'; }
+        if (btn) { btn.innerHTML = '<i class="fa-solid fa-play text-[10px]"></i> Inici'; btn.className = 'bg-teal-500 hover:bg-teal-400 text-slate-950 font-bold px-4 py-1.5 rounded-xl text-xs flex items-center gap-1'; }
         showToast('Activitat pausada.');
       } else {
         task.running = true;
-        if (btn) { btn.innerHTML = '<i class="fa-solid fa-pause text-[10px]"></i> Pausa'; btn.className = 'bg-rose-500 hover:bg-rose-400 text-white font-bold px-4 py-1.5 rounded-xl text-xs flex items-center gap-1 transition'; }
+        if (btn) { btn.innerHTML = '<i class="fa-solid fa-pause text-[10px]"></i> Pausa'; btn.className = 'bg-rose-500 hover:bg-rose-400 text-white font-bold px-4 py-1.5 rounded-xl text-xs flex items-center gap-1'; }
         showToast('Cronòmetre actiu!');
         task.timerInterval = setInterval(() => { task.seconds++; if (display) display.innerText = formatTime(task.seconds); }, 1000);
       }

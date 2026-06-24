@@ -1,0 +1,1828 @@
+<!DOCTYPE html>
+<html lang="ca">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FOCUS - El teu gestor de productivitat</title>
+
+  <!-- 📱 CONFIGURACIÓ DE LA TEVA PWA (Pas 2) -->
+  <!-- Enllaç al manifest que conté les icones i els colors del mòbil -->
+  <link class="pwa-setup" rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#06b6d4">
+
+  <!-- Registre del Service Worker (perquè l'app funcioni sense connexió a Internet) -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        // Fem servir './sw.js' per evitar errors de rutes en servidors gratuïts
+        navigator.serviceWorker.register('./sw.js')
+          .then(reg => console.log('Service Worker registrat correctament!', reg))
+          .catch(err => console.error('Error en registrar el Service Worker:', err));
+      });
+    }
+  </script>
+  <!-- ------------------------------------------------------------------ -->
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- FontAwesome per a les icones del disseny tipus app de mòbil -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght=300;400;500;600;700;800&display=swap');
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+    }
+    /* Estilització per a simular una pantalla de mòbil premium si s'obre en escriptori */
+    .app-container {
+      max-width: 480px;
+      min-height: 850px;
+    }
+    /* Scrollbars amagats per a una experiència d'app nativa */
+    .no-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+    .no-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 flex justify-center items-center min-h-screen">
+
+  <!-- Contenidor Principal de l'App (Simulador de Mòbil Premium) -->
+  <div class="app-container w-full sm:rounded-[3rem] sm:border-8 sm:border-slate-800 bg-black shadow-2xl relative flex flex-col overflow-hidden sm:ring-4 sm:ring-slate-900">
+    
+    <!-- Barra de dalt d'estat del mòbil simulada -->
+    <div class="bg-slate-950 px-6 pt-3 pb-1 flex justify-between items-center text-xs text-slate-400 select-none z-20">
+      <span class="font-semibold" id="current-time">17:38</span>
+      <div class="flex items-center gap-1.5">
+        <i class="fa-solid fa-wifi"></i>
+        <i class="fa-solid fa-signal"></i>
+        <i class="fa-solid fa-battery-full text-teal-400"></i>
+      </div>
+    </div>
+
+    <!-- NOTIFICACIÓ INTERACTIVA DE REPROGRAMACIÓ I AVISOS -->
+    <div id="reprogram-notification" class="hidden absolute top-12 left-4 right-4 bg-gradient-to-r from-teal-500 to-emerald-500 text-slate-950 px-4 py-3.5 rounded-2xl flex flex-col gap-2 shadow-2xl transition-all duration-300 z-50">
+      <div class="flex justify-between items-center">
+        <div class="flex items-center gap-2">
+          <i class="fa-solid fa-play animate-ping text-xs"></i>
+          <span class="text-xs font-black uppercase tracking-wider">Tasca Iniciada Automàticament!</span>
+        </div>
+        <button onclick="closeReprogramNotification()" class="text-slate-950 hover:text-slate-800"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="flex justify-between items-center">
+        <p class="text-xs font-medium" id="reprogram-task-name">Nom de la tasca...</p>
+        <button id="reprogram-btn-action" class="bg-slate-950 hover:bg-slate-900 text-teal-400 text-[10px] font-extrabold py-1.5 px-3 rounded-lg shadow transition">
+          <i class="fa-solid fa-clock-rotate-left"></i> Reprogramar
+        </button>
+      </div>
+    </div>
+
+    <header class="bg-slate-950 px-6 py-4 flex justify-between items-center border-b border-slate-900 z-20">
+      <div class="flex items-center gap-3">
+        <div class="bg-amber-400/10 p-2 rounded-xl text-amber-400 animate-pulse">
+          <i class="fa-solid fa-lightbulb text-xl"></i>
+        </div>
+        <h1 class="text-2xl font-extrabold tracking-widest text-teal-400">FOCUS</h1>
+      </div>
+      <button class="bg-slate-900 hover:bg-slate-800 p-2 rounded-xl text-teal-400 transition" onclick="toggleCloudSync()">
+        <i class="fa-solid fa-cloud-arrow-up" id="cloud-icon"></i>
+      </button>
+    </header>
+
+    <!-- PANTALLA PRINCIPAL: TASQUES -->
+    <main id="view-tareas" class="flex-1 overflow-y-auto no-scrollbar px-5 py-6 space-y-6 pb-24 z-10">
+      
+      <!-- Secció Data i Botó Afegir -->
+      <div class="flex justify-between items-center">
+        <div>
+          <span class="text-xs text-slate-400 uppercase tracking-wider font-semibold">Avui</span>
+          <h2 class="text-xl font-bold flex items-center gap-2 text-slate-200">
+            Dimecres, 24 de juny <i class="fa-regular fa-calendar text-teal-500 text-sm"></i>
+          </h2>
+        </div>
+        <button onclick="openAddTaskModal()" class="bg-teal-500 hover:bg-teal-400 text-slate-950 font-bold px-4 py-2.5 rounded-2xl flex items-center gap-1.5 transition shadow-lg shadow-teal-500/10 active:scale-95">
+          <i class="fa-solid fa-plus"></i> Nova
+        </button>
+      </div>
+
+      <section class="bg-gradient-to-r from-slate-900 to-slate-950 border border-slate-800 rounded-3xl p-5 space-y-2 relative overflow-hidden shadow-inner">
+        <div class="absolute -right-4 -bottom-4 text-slate-800/10 text-7xl font-bold">
+          <i class="fa-solid fa-quote-right"></i>
+        </div>
+        <h3 class="text-xs font-bold text-teal-500 uppercase tracking-widest flex items-center gap-2">
+          <i class="fa-solid fa-star text-amber-400"></i> Inspiració Diària
+        </h3>
+        <p class="text-sm italic text-slate-300 relative z-10" id="daily-inspiration-text">
+          "La concentració és el secret de la força en la política, en la guerra, en el comerç i en tots els aspectes de la vida."
+        </p>
+      </section>
+
+      <!-- Navegació de Temps -->
+      <div class="grid grid-cols-3 bg-slate-900/50 p-1.5 rounded-2xl border border-slate-900">
+        <button class="py-2 text-xs font-bold rounded-xl text-teal-400 bg-slate-900 border border-slate-800 shadow" id="tab-dia">Día</button>
+        <button class="py-2 text-xs font-semibold rounded-xl text-slate-400 hover:text-slate-200 transition" id="tab-setmana">Setmana</button>
+        <button class="py-2 text-xs font-semibold rounded-xl text-slate-400 hover:text-slate-200 transition" id="tab-mes">Mes</button>
+      </div>
+
+      <!-- Filtre de Dies -->
+      <div class="flex gap-2">
+        <button class="flex-1 py-2 text-xs font-semibold rounded-xl bg-slate-900/40 text-slate-400 border border-slate-900 hover:bg-slate-900/80 transition">Ahir</button>
+        <button class="flex-1 py-2 text-xs font-bold rounded-xl bg-teal-500/20 text-teal-400 border border-teal-500/30">Avui</button>
+        <button class="flex-1 py-2 text-xs font-semibold rounded-xl bg-slate-900/40 text-slate-400 border border-slate-900 hover:bg-slate-900/80 transition">Demà</button>
+      </div>
+
+      <div class="space-y-4">
+        <div class="flex justify-between items-center px-1">
+          <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Tasques Planificades (<span id="task-count">1</span>)</h3>
+          <button onclick="clearCompletedTasks()" class="text-xs text-rose-400 hover:text-rose-300 font-semibold transition">Netejar fetes</button>
+        </div>
+
+        <div id="tasks-list" class="space-y-3">
+          <!-- Primera tasca que es carrega per defecte -->
+          <div class="bg-slate-900/80 border border-slate-800 rounded-3xl p-5 space-y-4 transition-all" id="task-default">
+            <div class="flex justify-between items-start">
+              <div class="flex items-center gap-3">
+                <input type="checkbox" id="check-default" class="w-5 h-5 rounded-lg border-slate-700 bg-slate-800 text-teal-500 focus:ring-teal-500 focus:ring-offset-slate-900" onchange="toggleTaskStyle('default')">
+                <div>
+                  <h4 class="font-bold text-base text-slate-100" id="title-default">Fer esport</h4>
+                  <p class="text-xs text-slate-400">Gym habitual de tarda</p>
+                </div>
+              </div>
+              <div class="flex items-center gap-2">
+                <button onclick="resetTimer('default')" class="text-slate-500 hover:text-slate-300 transition text-sm">
+                  <i class="fa-solid fa-rotate-right"></i>
+                </button>
+                <button onclick="deleteTask('default')" class="text-slate-500 hover:text-rose-400 transition text-sm">
+                  <i class="fa-solid fa-trash-can"></i>
+                </button>
+              </div>
+            </div>
+
+            <div class="flex justify-between items-center pt-2 border-t border-slate-800/60">
+              <div class="flex gap-2">
+                <span class="bg-emerald-500/10 text-emerald-400 text-[10px] font-bold px-2.5 py-1 rounded-lg border border-emerald-500/20">Salut</span>
+                <span class="bg-slate-800 text-slate-300 text-[10px] font-bold px-2.5 py-1 rounded-lg flex items-center gap-1">
+                  <i class="fa-regular fa-clock"></i> 19:00
+                </span>
+              </div>
+              <div class="flex items-center gap-3">
+                <span class="text-sm font-mono font-bold text-slate-300" id="timer-display-default">00:00:03</span>
+                <button id="btn-timer-default" onclick="toggleTimer('default')" class="bg-teal-500 hover:bg-teal-400 text-slate-950 font-bold px-4 py-1.5 rounded-xl text-xs flex items-center gap-1 transition shadow shadow-teal-500/10">
+                  <i class="fa-solid fa-play text-[10px]"></i> Inici
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </main>
+
+    <!-- PANTALLA: OBJECTIUS -->
+    <main id="view-objetivos" class="hidden flex-1 overflow-y-auto no-scrollbar px-5 py-6 space-y-6 pb-24 z-10">
+      <div class="flex justify-between items-center">
+        <div>
+          <span class="text-xs text-slate-400 uppercase tracking-wider font-semibold">Repte Setmanal</span>
+          <h2 class="text-xl font-bold text-slate-200">Els meus Objectius <i class="fa-solid fa-bullseye text-teal-400 ml-1"></i></h2>
+        </div>
+      </div>
+
+      <!-- Formulari d'afegir objectiu des d'una llista desplegable d'ajustos -->
+      <div class="bg-slate-900 border border-slate-800 rounded-3xl p-5 space-y-3 shadow-lg">
+        <label class="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+          <i class="fa-solid fa-plus-circle text-teal-400"></i> Afegir Nou Objectiu al Tauler
+        </label>
+        <div class="flex flex-col gap-2">
+          <input type="text" id="input-new-custom-objective-text" placeholder="Escriu un títol general d'objectiu..." class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-teal-500 transition">
+          <div class="flex gap-2">
+            <select id="select-objectiu-plantilla" class="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-teal-500 transition">
+              <!-- S'omple dinàmicament -->
+            </select>
+            <button onclick="addObjectiuFromSettings()" class="bg-teal-500 hover:bg-teal-400 text-slate-950 font-extrabold px-4 py-2 rounded-xl text-xs transition active:scale-95">
+              Afegir
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Caixa de Progrés de la Setmana -->
+      <div class="bg-slate-900 border border-slate-800 rounded-3xl p-5 space-y-4">
+        <h3 class="text-sm font-bold text-teal-400 flex items-center gap-2">
+          <i class="fa-solid fa-circle-notch text-xs animate-spin text-teal-500"></i> Progrés Global d'Objectius
+        </h3>
+        <div class="w-full bg-slate-800 rounded-full h-3">
+          <div id="objectives-progress-bar" class="bg-teal-500 h-3 rounded-full transition-all duration-500" style="width: 50%"></div>
+        </div>
+        <p class="text-xs text-slate-400 text-right" id="objectives-percentage-text">1 de 2 objectius completats (50%)</p>
+      </div>
+
+      <div class="space-y-4" id="objectives-list">
+        <!-- Es carrega dinàmicament -->
+      </div>
+    </main>
+
+    <!-- PANTALLA: NOTES -->
+    <main id="view-notas" class="hidden flex-1 overflow-y-auto no-scrollbar px-5 py-6 space-y-6 pb-24 z-10">
+      <div class="flex justify-between items-center">
+        <div>
+          <span class="text-xs text-slate-400 uppercase tracking-wider font-semibold">Taulers de dades</span>
+          <h2 class="text-xl font-bold text-slate-200">Notes i Taules <i class="fa-solid fa-table-cells text-amber-400 ml-1"></i></h2>
+        </div>
+      </div>
+
+      <!-- Taula 1: Activitats Pendents -->
+      <div class="bg-slate-900 border border-slate-800 rounded-3xl p-5 space-y-4 shadow-lg">
+        <div class="flex justify-between items-center flex-wrap gap-2">
+          <h3 class="text-sm font-bold text-amber-400 flex items-center gap-2">
+            <i class="fa-solid fa-list-check"></i> Activitats Pendents
+          </h3>
+          <div class="flex items-center gap-1.5">
+            <button onclick="exportActivitiesToExcel()" class="bg-emerald-600 hover:bg-emerald-500 text-slate-950 hover:text-slate-900 px-2.5 py-1.5 rounded-lg transition text-xs font-black flex items-center gap-1 shadow">
+              <i class="fa-regular fa-file-excel text-sm"></i> Exporta
+            </button>
+            <button onclick="addActivityRow()" class="bg-amber-400/20 text-amber-400 hover:bg-amber-400/30 p-1.5 px-2.5 rounded-lg transition text-xs font-bold flex items-center gap-1">
+              <i class="fa-solid fa-plus"></i> Fila
+            </button>
+          </div>
+        </div>
+        <div class="overflow-x-auto rounded-xl border border-slate-800">
+          <table class="w-full text-left text-sm text-slate-400">
+            <thead class="text-xs text-slate-300 uppercase bg-slate-800/50">
+              <tr>
+                <th scope="col" class="px-3 py-3">Activitat</th>
+                <th scope="col" class="px-3 py-3">Obs</th>
+                <th scope="col" class="px-3 py-3 text-center w-12">Acció</th>
+              </tr>
+            </thead>
+            <tbody id="activities-table-body" class="divide-y divide-slate-800">
+              <!-- S'omplirà dinàmicament -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Taula 2: Contrasenyes -->
+      <div class="bg-slate-900 border border-slate-800 rounded-3xl p-5 space-y-4 shadow-lg">
+        <div class="flex justify-between items-center flex-wrap gap-2">
+          <h3 class="text-sm font-bold text-teal-400 flex items-center gap-2">
+            <i class="fa-solid fa-key"></i> Contrasenyes
+          </h3>
+          <div class="flex items-center gap-1.5">
+            <button onclick="exportPasswordsToExcel()" class="bg-emerald-600 hover:bg-emerald-500 text-slate-950 hover:text-slate-900 px-2.5 py-1.5 rounded-lg transition text-xs font-black flex items-center gap-1 shadow">
+              <i class="fa-regular fa-file-excel text-sm"></i> Exporta
+            </button>
+            <button onclick="addPasswordRow()" class="bg-teal-500/20 text-teal-400 p-1.5 rounded-lg hover:bg-teal-500/30 transition text-xs" id="btn-add-pass-row">
+              <i class="fa-solid fa-plus"></i> Fila
+            </button>
+          </div>
+        </div>
+        <div class="overflow-x-auto rounded-xl border border-slate-800">
+          <table class="w-full text-left text-sm text-slate-400">
+            <thead class="text-xs text-slate-300 uppercase bg-slate-800/50">
+              <tr>
+                <th scope="col" class="px-3 py-3">Lloc / Obs</th>
+                <th scope="col" class="px-3 py-3">Usuari</th>
+                <th scope="col" class="px-3 py-3">Clau</th>
+                <th scope="col" class="px-3 py-3 text-center w-12">Acció</th>
+              </tr>
+            </thead>
+            <tbody id="passwords-table-body" class="divide-y divide-slate-800">
+              <!-- S'omplirà dinàmicament -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </main>
+
+    <!-- PANTALLA: ESTADÍSTIQUES -->
+    <main id="view-estadisticas" class="hidden flex-1 overflow-y-auto no-scrollbar px-5 py-6 space-y-6 pb-24 z-10">
+      <div class="flex justify-between items-center">
+        <div>
+          <span class="text-xs text-slate-400 uppercase tracking-wider font-semibold">Rendiment</span>
+          <h2 class="text-xl font-bold text-slate-200">Temps de Concentració <i class="fa-solid fa-chart-simple text-teal-400 ml-1"></i></h2>
+        </div>
+        <button onclick="exportStatsToExcel()" class="bg-emerald-600 hover:bg-emerald-500 text-slate-950 font-black px-3 py-2 rounded-xl text-xs flex items-center gap-1.5 transition shadow shadow-emerald-500/20 active:scale-95">
+          <i class="fa-regular fa-file-excel text-sm"></i> Exporta
+        </button>
+      </div>
+
+      <!-- Cercle de Focus de la Setmana -->
+      <div class="bg-slate-900 border border-slate-800 rounded-3xl p-6 flex flex-col items-center text-center space-y-4">
+        <h3 class="text-sm font-bold text-slate-300">Total d'aquesta Setmana</h3>
+        <div class="relative w-36 h-36 flex items-center justify-center">
+          <svg class="w-full h-full transform -rotate-90">
+            <circle cx="72" cy="72" r="60" stroke="#1e293b" stroke-width="12" fill="transparent" />
+            <circle id="stats-circle-progress" cx="72" cy="72" r="60" stroke="#06b6d4" stroke-width="12" fill="transparent" stroke-dasharray="376.8" stroke-dashoffset="376.8" stroke-linecap="round" class="transition-all duration-700" />
+          </svg>
+          <div class="absolute flex flex-col items-center">
+            <span class="text-2xl font-black tracking-tight text-teal-400" id="stats-weekly-hours-total">00:00:00</span>
+            <span class="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Hores en Total</span>
+          </div>
+        </div>
+        <p class="text-xs text-slate-400 max-w-[240px]">El gràfic s'actualitza immediatament quan marques qualsevol tasca com a finalitzada!</p>
+      </div>
+
+      <!-- Gràfic de Barres Simulat Reactiu -->
+      <div class="bg-slate-900 border border-slate-800 rounded-3xl p-5 space-y-4">
+        <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Distribució per Dies</h3>
+        <div class="flex items-end justify-between h-36 px-2 pt-4">
+          <div class="flex flex-col items-center gap-2">
+            <div id="bar-Dl" class="bg-slate-800 hover:bg-slate-700 w-6 h-4 rounded-t-lg transition-all duration-500" title="Dilluns: 0s"></div>
+            <span class="text-[10px] text-slate-500 font-bold">Dl</span>
+          </div>
+          <div class="flex flex-col items-center gap-2">
+            <div id="bar-Dm" class="bg-slate-800 hover:bg-slate-700 w-6 h-4 rounded-t-lg transition-all duration-500" title="Dimarts: 0s"></div>
+            <span class="text-[10px] text-slate-500 font-bold">Dm</span>
+          </div>
+          <div class="flex flex-col items-center gap-2">
+            <div id="bar-Dc" class="bg-teal-500 w-6 h-4 rounded-t-lg shadow shadow-teal-500/10 transition-all duration-500" title="Dimecres: 0s"></div>
+            <span class="text-[10px] text-teal-400 font-bold">Dc</span>
+          </div>
+          <div class="flex flex-col items-center gap-2">
+            <div id="bar-Dj" class="bg-slate-800 hover:bg-slate-700 w-6 h-4 rounded-t-lg transition-all duration-500" title="Dijous: 0s"></div>
+            <span class="text-[10px] text-slate-500 font-bold">Dj</span>
+          </div>
+          <div class="flex flex-col items-center gap-2">
+            <div id="bar-Dv" class="bg-slate-800 hover:bg-slate-700 w-6 h-4 rounded-t-lg transition-all duration-500" title="Divendres: 0s"></div>
+            <span class="text-[10px] text-slate-500 font-bold">Dv</span>
+          </div>
+          <div class="flex flex-col items-center gap-2">
+            <div id="bar-Ds" class="bg-slate-800 hover:bg-slate-700 w-6 h-4 rounded-t-lg transition-all duration-500" title="Dissabte: 0s"></div>
+            <span class="text-[10px] text-slate-500 font-bold">Ds</span>
+          </div>
+          <div class="flex flex-col items-center gap-2">
+            <div id="bar-Dg" class="bg-slate-800 hover:bg-slate-700 w-6 h-4 rounded-t-lg transition-all duration-500" title="Diumenge: 0s"></div>
+            <span class="text-[10px] text-slate-500 font-bold">Dg</span>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- PANTALLA: AJUSTOS -->
+    <main id="view-ajustes" class="hidden flex-1 overflow-y-auto no-scrollbar px-5 py-6 space-y-6 pb-24 z-10">
+      <div>
+        <span class="text-xs text-slate-400 uppercase tracking-wider font-semibold">Configuració</span>
+        <h2 class="text-xl font-bold text-slate-200">Ajustos de FOCUS <i class="fa-solid fa-sliders text-teal-400 ml-1"></i></h2>
+      </div>
+
+      <!-- Perfil d'Usuari -->
+      <div class="bg-slate-900 border border-slate-800 rounded-3xl p-5 flex items-center gap-4">
+        <div class="relative">
+          <div class="w-16 h-16 rounded-2xl bg-teal-500/10 border-2 border-teal-500 flex items-center justify-center text-teal-400 text-2xl font-black">
+            FP
+          </div>
+          <span class="absolute bottom-0 right-0 bg-emerald-500 w-4.5 h-4.5 rounded-full border-2 border-slate-900 flex items-center justify-center text-[8px] text-white">
+            <i class="fa-solid fa-check"></i>
+          </span>
+        </div>
+        <div>
+          <h3 class="font-bold text-slate-100 text-base" id="user-display-name">Profe FP</h3>
+          <p class="text-xs text-slate-400">Administrador de FOCUS</p>
+        </div>
+      </div>
+
+      <!-- Menú d'Opcions d'Ajustos -->
+      <div class="bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden divide-y divide-slate-800/60">
+        <!-- Canviar Nom -->
+        <div class="p-4 flex justify-between items-center hover:bg-slate-800/40 transition cursor-pointer" onclick="openNameModal()">
+          <div class="flex items-center gap-3">
+            <i class="fa-solid fa-user-pen text-slate-400 text-sm"></i>
+            <span class="text-sm font-semibold text-slate-200">Editar nom del perfil</span>
+          </div>
+          <i class="fa-solid fa-chevron-right text-slate-600 text-xs"></i>
+        </div>
+
+        <!-- Modificar Inspiració -->
+        <div class="p-4 flex justify-between items-center hover:bg-slate-800/40 transition cursor-pointer" onclick="openQuoteModal()">
+          <div class="flex items-center gap-3">
+            <i class="fa-solid fa-pen-fancy text-slate-400 text-sm"></i>
+            <span class="text-sm font-semibold text-slate-200">Personalitzar frase inspiradora</span>
+          </div>
+          <i class="fa-solid fa-chevron-right text-slate-600 text-xs"></i>
+        </div>
+
+        <!-- Mode Fosc / Clar Simulació -->
+        <div class="p-4 flex justify-between items-center hover:bg-slate-800/40 transition">
+          <div class="flex items-center gap-3">
+            <i class="fa-solid fa-moon text-teal-400 text-sm"></i>
+            <span class="text-sm font-semibold text-slate-200">Interfície de l'App (Fosc/Clar)</span>
+          </div>
+          <span class="text-xs bg-teal-500/20 text-teal-400 font-bold px-2 py-1 rounded-lg">Fosc per defecte</span>
+        </div>
+
+        <!-- Resetear Dades -->
+        <div class="p-4 flex justify-between items-center hover:bg-slate-800/40 transition cursor-pointer" onclick="openResetModal()">
+          <div class="flex items-center gap-3">
+            <i class="fa-solid fa-triangle-exclamation text-rose-400 text-sm"></i>
+            <span class="text-sm font-semibold text-rose-400">Esborrar i restablir de zero</span>
+          </div>
+          <i class="fa-solid fa-trash-can text-rose-500 text-xs"></i>
+        </div>
+      </div>
+
+      <!-- Llistes de dades d'ajustos -->
+      <div class="bg-slate-900 border border-slate-800 rounded-3xl p-5 space-y-5">
+        <h3 class="text-sm font-bold text-teal-400 flex items-center gap-2">
+          <i class="fa-solid fa-list"></i> Llistes Personalitzables
+        </h3>
+        
+        <!-- 1. Llista de Tasques -->
+        <div class="space-y-3">
+          <label class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">1. Llista de Tasques</label>
+          <div class="flex gap-2">
+            <input type="text" id="new-custom-task" placeholder="Nova tasca per al menú..." class="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-teal-500 transition">
+            <button onclick="addCustomTask()" class="bg-teal-500 hover:bg-teal-400 text-slate-950 font-bold px-3 py-2 rounded-xl text-xs transition">Afegir</button>
+          </div>
+          <div id="custom-tasks-container" class="flex flex-wrap gap-2 max-h-32 overflow-y-auto no-scrollbar p-2 bg-slate-950/50 rounded-xl border border-slate-800/50">
+            <!-- S'omplirà dinàmicament -->
+          </div>
+        </div>
+
+        <!-- 2. Llista d'Objectius de plantilla -->
+        <div class="space-y-3 pt-4 border-t border-slate-800">
+          <label class="text-[10px] font-bold text-slate-400 uppercase tracking-wider text-teal-400">2. Llista d'Objectius Disponibles (Desplegable)</label>
+          <div class="flex gap-2">
+            <input type="text" id="new-custom-objective" placeholder="Ex: Córrer 20 minuts..." class="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-teal-500 transition">
+            <button onclick="addCustomObjectiveFromSettings()" class="bg-teal-500 hover:bg-teal-400 text-slate-950 font-bold px-3 py-2 rounded-xl text-xs transition">Afegir</button>
+          </div>
+          <div id="custom-objectives-container" class="flex flex-wrap gap-2 max-h-32 overflow-y-auto no-scrollbar p-2 bg-slate-950/50 rounded-xl border border-slate-800/50">
+            <!-- S'omplirà dinàmicament -->
+          </div>
+        </div>
+
+        <!-- 3. Llista d'Activitats -->
+        <div class="space-y-3 pt-4 border-t border-slate-800">
+          <label class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">3. Llista d'Activitats Pendents</label>
+          <div class="flex gap-2">
+            <input type="text" id="new-custom-activity" placeholder="Nova activitat per a la taula..." class="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-amber-400 transition">
+            <button onclick="addCustomActivity()" class="bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold px-3 py-2 rounded-xl text-xs transition">Afegir</button>
+          </div>
+          <div id="custom-activities-container" class="flex flex-wrap gap-2 max-h-32 overflow-y-auto no-scrollbar p-2 bg-slate-950/50 rounded-xl border border-slate-800/50">
+            <!-- S'omplirà dinàmicament -->
+          </div>
+        </div>
+
+        <!-- 4. Llista de Categories / Etiquetes -->
+        <div class="space-y-3 pt-4 border-t border-slate-800">
+          <label class="text-[10px] font-bold text-teal-400 uppercase tracking-wider">4. Llista de Categories / Etiquetes</label>
+          <div class="flex gap-2">
+            <input type="text" id="new-custom-tag" placeholder="Ex: Estudis, Salut, Comerç..." class="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-teal-500 transition">
+            <button onclick="addCustomTag()" class="bg-teal-500 hover:bg-teal-400 text-slate-950 font-bold px-3 py-2 rounded-xl text-xs transition">Afegir</button>
+          </div>
+          <div id="custom-tags-container" class="flex flex-wrap gap-2 max-h-32 overflow-y-auto no-scrollbar p-2 bg-slate-950/50 rounded-xl border border-slate-800/50">
+            <!-- S'omplirà dinàmicament -->
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- NAVEGACIÓ INFERIOR -->
+    <nav class="absolute bottom-0 left-0 right-0 bg-slate-950/95 backdrop-blur border-t border-slate-900 grid grid-cols-5 py-3 px-2 text-center select-none z-20">
+      <button onclick="switchTab('tareas')" id="nav-btn-tareas" class="flex flex-col items-center justify-center gap-1 text-teal-400 transition transform active:scale-90">
+        <div class="p-1 rounded-xl bg-teal-500/10" id="icon-container-tareas">
+          <i class="fa-solid fa-list-check text-lg"></i>
+        </div>
+        <span class="text-[9px] font-bold tracking-wider">Tasques</span>
+      </button>
+
+      <button onclick="switchTab('objetivos')" id="nav-btn-objetivos" class="flex flex-col items-center justify-center gap-1 text-slate-500 hover:text-slate-300 transition transform active:scale-90">
+        <div class="p-1 rounded-xl" id="icon-container-objetivos">
+          <i class="fa-solid fa-bullseye text-lg"></i>
+        </div>
+        <span class="text-[9px] font-semibold tracking-wider">Objectius</span>
+      </button>
+
+      <button onclick="switchTab('notas')" id="nav-btn-notas" class="flex flex-col items-center justify-center gap-1 text-slate-500 hover:text-slate-300 transition transform active:scale-90">
+        <div class="p-1 rounded-xl" id="icon-container-notas">
+          <i class="fa-regular fa-sticky-note text-lg"></i>
+        </div>
+        <span class="text-[9px] font-semibold tracking-wider">Notes</span>
+      </button>
+
+      <button onclick="switchTab('estadisticas')" id="nav-btn-estadisticas" class="flex flex-col items-center justify-center gap-1 text-slate-500 hover:text-slate-300 transition transform active:scale-90">
+        <div class="p-1 rounded-xl" id="icon-container-estadisticas">
+          <i class="fa-solid fa-chart-simple text-lg"></i>
+        </div>
+        <span class="text-[9px] font-semibold tracking-wider">Estadístiques</span>
+      </button>
+
+      <button onclick="switchTab('ajustes')" id="nav-btn-ajustes" class="flex flex-col items-center justify-center gap-1 text-slate-500 hover:text-slate-300 transition transform active:scale-90">
+        <div class="p-1 rounded-xl" id="icon-container-ajustes">
+          <i class="fa-solid fa-sliders text-lg"></i>
+        </div>
+        <span class="text-[9px] font-semibold tracking-wider">Ajustos</span>
+      </button>
+    </nav>
+
+    <!-- MODAL NOVA TASCA / REPROGRAMACIÓ -->
+    <div id="add-task-modal" class="hidden absolute inset-0 bg-black/80 backdrop-blur-sm flex justify-center items-end z-30 transition-all">
+      <div class="bg-slate-900 border-t border-slate-800 rounded-t-[2.5rem] w-full p-6 space-y-6 shadow-2xl overflow-y-auto max-h-[85%] no-scrollbar">
+        <div class="flex justify-between items-center">
+          <h3 id="modal-task-title" class="text-lg font-bold text-slate-100">Nova Tasca FOCUS</h3>
+          <button onclick="closeAddTaskModal()" class="text-slate-400 hover:text-slate-200 transition text-lg">
+            <i class="fa-solid fa-circle-xmark"></i>
+          </button>
+        </div>
+
+        <form id="task-form" onsubmit="createNewTask(event)" class="space-y-4">
+          <!-- ID Ocult de la tasca en cas de reprogramar-la -->
+          <input type="hidden" id="input-task-id-hidden" value="">
+
+          <div class="space-y-1.5">
+            <label class="text-xs font-bold text-slate-400 uppercase tracking-wider">Nom de la tasca</label>
+            <select id="input-task-name" required class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-slate-200 focus:outline-none focus:border-teal-500 transition">
+              <!-- S'omplirà dinàmicament segons els ajustos -->
+            </select>
+          </div>
+
+          <div class="space-y-1.5">
+            <label class="text-xs font-bold text-slate-400 uppercase tracking-wider">Descripció o Detalls</label>
+            <input type="text" id="input-task-desc" placeholder="Ex: Repassar conceptes i lleis de la Gestalt" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-slate-200 focus:outline-none focus:border-teal-500 transition">
+          </div>
+
+          <!-- Selecció estructurada de llista de Data i Hora -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div class="space-y-1.5">
+              <label class="text-xs font-bold text-slate-400 uppercase tracking-wider">Triar Data de la Llista</label>
+              <select id="input-task-date-select" required class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-slate-200 focus:outline-none focus:border-teal-500 transition">
+                <option value="today">Avui</option>
+                <option value="tomorrow">Demà</option>
+                <option value="other">Altra data...</option>
+              </select>
+              <!-- Selector de data real ocult de base -->
+              <div id="other-date-container" class="hidden mt-2">
+                <input type="date" id="input-task-date-picker" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-slate-200 focus:outline-none focus:border-teal-500 transition">
+              </div>
+            </div>
+            <div class="space-y-1.5">
+              <label class="text-xs font-bold text-slate-400 uppercase tracking-wider">Triar Hora de la Llista</label>
+              <select id="input-task-time-select" required class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-slate-200 focus:outline-none focus:border-teal-500 transition">
+                <!-- Es genera dinàmicament de 8:00 AM a 11:00 PM cada 30 min -->
+              </select>
+            </div>
+          </div>
+
+          <div class="space-y-1.5">
+            <label class="text-xs font-bold text-slate-400 uppercase tracking-wider">Categoria / Etiqueta</label>
+            <select id="input-task-tag" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-slate-200 focus:outline-none focus:border-teal-500 transition">
+              <!-- Es carrega dinàmicament des de customTagsList -->
+            </select>
+          </div>
+
+          <button type="submit" id="task-submit-btn" class="w-full bg-teal-500 hover:bg-teal-400 text-slate-950 font-extrabold py-4 rounded-xl text-sm transition shadow-lg shadow-teal-500/10 flex items-center justify-center gap-2">
+            <i class="fa-regular fa-calendar-check text-lg"></i> Desar i Planificar
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <!-- MODAL CUSTOM PROMPT / INPUT (Editar Nom / Inspiració / Categories) -->
+    <div id="custom-prompt-modal" class="hidden absolute inset-0 bg-black/85 backdrop-blur-sm flex justify-center items-center z-45 px-6">
+      <div class="bg-slate-900 border border-slate-800 rounded-3xl w-full p-6 space-y-4 shadow-2xl">
+        <h3 id="prompt-modal-title" class="text-base font-bold text-teal-400">Canviar Valor</h3>
+        <p id="prompt-modal-desc" class="text-xs text-slate-400">Introdueix la nova dada:</p>
+        <input type="text" id="prompt-modal-input" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-slate-200 focus:outline-none focus:border-teal-500 transition">
+        <div class="flex justify-end gap-3 pt-2">
+          <button onclick="closePromptModal()" class="text-xs font-bold text-slate-400 hover:text-slate-200 px-4 py-2 rounded-lg">Cancel·lar</button>
+          <button id="prompt-modal-submit" class="bg-teal-500 hover:bg-teal-400 text-slate-950 font-bold text-xs px-4 py-2 rounded-xl transition">Confirmar</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL CUSTOM PROMPT / INPUT (Editar Nom / Inspiració / Categories) -->
+    <div id="custom-prompt-modal" class="hidden absolute inset-0 bg-black/85 backdrop-blur-sm flex justify-center items-center z-45 px-6">
+      <div class="bg-slate-900 border border-slate-800 rounded-3xl w-full p-6 space-y-4 shadow-2xl">
+        <h3 id="prompt-modal-title" class="text-base font-bold text-teal-400">Canviar Valor</h3>
+        <p id="prompt-modal-desc" class="text-xs text-slate-400">Introdueix la nova dada:</p>
+        <input type="text" id="prompt-modal-input" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-slate-200 focus:outline-none focus:border-teal-500 transition">
+        <div class="flex justify-end gap-3 pt-2">
+          <button onclick="closePromptModal()" class="text-xs font-bold text-slate-400 hover:text-slate-200 px-4 py-2 rounded-lg">Cancel·lar</button>
+          <button id="prompt-modal-submit" class="bg-teal-500 hover:bg-teal-400 text-slate-950 font-bold text-xs px-4 py-2 rounded-xl transition">Guardar</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL CUSTOM CONFIRM (Esborrar i reinicir dades) -->
+    <div id="custom-confirm-modal" class="hidden absolute inset-0 bg-black/85 backdrop-blur-sm flex justify-center items-center z-45 px-6">
+      <div class="bg-slate-900 border border-slate-800 rounded-3xl w-full p-6 space-y-4 shadow-2xl">
+        <div class="flex items-center gap-3 text-rose-400">
+          <i class="fa-solid fa-triangle-exclamation text-xl"></i>
+          <h3 id="confirm-modal-title" class="text-base font-bold">Atenció</h3>
+        </div>
+        <p id="confirm-modal-desc" class="text-xs text-slate-400">Estàs segur de voler continuar amb aquesta acció?</p>
+        <div class="flex justify-end gap-3 pt-2">
+          <button onclick="closeConfirmModal()" class="text-xs font-bold text-slate-400 hover:text-slate-200 px-4 py-2 rounded-lg">Cancel·lar</button>
+          <button id="confirm-modal-submit" class="bg-rose-500 hover:bg-rose-400 text-white font-bold text-xs px-4 py-2 rounded-xl transition">Acceptar</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- NOTIFICACIÓ STANDARD TOAST INTEGRADA -->
+    <div id="toast-notification" class="hidden absolute top-16 left-6 right-6 bg-teal-500 text-slate-950 px-4 py-3.5 rounded-2xl flex items-center gap-3 shadow-lg transition-all duration-300 transform -translate-y-10 opacity-0 z-40">
+      <i class="fa-solid fa-circle-info text-lg"></i>
+      <span class="text-xs font-bold" id="toast-message">Missatge de l'aplicació</span>
+    </div>
+
+  </div>
+
+  <script>
+    // Variables i estat global de l'aplicació
+    const tasks = {
+      default: {
+        id: 'default',
+        title: 'Fer esport',
+        desc: 'Gym habitual de tarda',
+        tag: 'Salut',
+        time: '19:00',
+        date: new Date().toISOString().split('T')[0],
+        seconds: 3,
+        running: false,
+        timerInterval: null,
+        completed: false
+      }
+    };
+
+    // Llistes inicials i personalitzables dels Ajustaments
+    let customTasksList = ["Fer esport", "Preparar examen de Retail", "Estudiar apunts", "Reunió de projecte", "Llegir llibre de disseny"];
+    let customActivitiesList = ["Revisar correus", "Trucar client", "Actualitzar excel", "Redactar informe", "Disenyar interfície"];
+    let customTagsList = ["Estudis", "Treball", "Salut", "Comerç"];
+    
+    let customObjectivesTemplates = [
+      "Estudiar 10 hores d'FP", 
+      "Anar al gimnàs 3 dies", 
+      "Llegir 50 pàgines de disseny", 
+      "Finalitzar mockup mòbil", 
+      "Beure 2 litres d'aigua diaris"
+    ];
+
+    // Objectius del tauler principal (Estat actualitzat amb 5 sub-tasques elegibles de la llista de tasques)
+    let objectives = [
+      { 
+        id: 'obj1', 
+        text: "Projecte Final d'FP", 
+        completed: false, 
+        status: "En progrés (0/5 completades)", 
+        percent: 0,
+        tasks: [
+          { name: "Preparar examen de Retail", completed: false, date: "" },
+          { name: "Estudiar apunts", completed: false, date: "" },
+          { name: "Reunió de projecte", completed: false, date: "" },
+          { name: "Llegir llibre de disseny", completed: false, date: "" },
+          { name: "Fer esport", completed: false, date: "" }
+        ]
+      },
+      { 
+        id: 'obj2', 
+        text: "Pla de Benestar Setmanal", 
+        completed: false, 
+        status: "En progrés (0/5 completades)", 
+        percent: 0,
+        tasks: [
+          { name: "Fer esport", completed: false, date: "" },
+          { name: "Fer esport", completed: false, date: "" },
+          { name: "Fer esport", completed: false, date: "" },
+          { name: "Llegir llibre de disseny", completed: false, date: "" },
+          { name: "Estudiar apunts", completed: false, date: "" }
+        ]
+      }
+    ];
+
+    // Dades diàries en segons de concentració (per agrupar a les estadístiques)
+    let statsDailySeconds = {
+      'Dl': 12 * 60,  // 12 minuts precarregats
+      'Dm': 25 * 60,  // 25 minuts precarregats
+      'Dc': 15 * 60,  // 15 minuts de base per avui
+      'Dj': 18 * 60,
+      'Dv': 30 * 60,
+      'Ds': 0,
+      'Dg': 0
+    };
+
+    // Dades per a les taules (Notes)
+    let activitiesTableData = [
+      { activity: "Revisar correus", obs: "Molt urgent per avui" },
+      { activity: "Actualitzar excel", obs: "Revisar factures del mes" }
+    ];
+    let passwordsTableData = [
+      { obs: "Correu corporatiu", user: "admin@empresa.cat", pass: "1234abcd*" },
+      { obs: "Accés Servidor", user: "root_focus", pass: "F0cusPass_2026!" }
+    ];
+
+    // Enllaç actual per al diàleg de text d'ajustements simulats
+    let promptCallback = null;
+    let confirmCallback = null;
+
+    // Actualitza l'hora simulada a la barra d'estat
+    function updateClock() {
+      const now = new Date();
+      let hours = now.getHours().toString().padStart(2, '0');
+      let minutes = now.getMinutes().toString().padStart(2, '0');
+      document.getElementById('current-time').innerText = `${hours}:${minutes}`;
+    }
+    setInterval(updateClock, 1000);
+    updateClock();
+
+    function showToast(message) {
+      const toast = document.getElementById('toast-notification');
+      document.getElementById('toast-message').innerText = message;
+      toast.classList.remove('hidden');
+      setTimeout(() => {
+        toast.classList.remove('-translate-y-10', 'opacity-0');
+        toast.classList.add('translate-y-0', 'opacity-100');
+      }, 50);
+
+      setTimeout(() => {
+        toast.classList.remove('translate-y-0', 'opacity-100');
+        toast.classList.add('-translate-y-10', 'opacity-0');
+        setTimeout(() => {
+          toast.classList.add('hidden');
+        }, 300);
+      }, 3000);
+    }
+
+    // Generar dinàmicament llistat d'hores cada 30 minuts de 8:00 AM a 11:00 PM (23:00)
+    function populateTimeSelect() {
+      const timeSelect = document.getElementById('input-task-time-select');
+      if (!timeSelect) return;
+      timeSelect.innerHTML = '';
+      
+      for (let hour = 8; hour <= 23; hour++) {
+        const hourStr = hour.toString().padStart(2, '0');
+        
+        // Slot minut :00
+        const opt00 = document.createElement('option');
+        opt00.value = `${hourStr}:00`;
+        opt00.textContent = `${hourStr}:00`;
+        timeSelect.appendChild(opt00);
+        
+        // Slot minut :30 (excepte a les 23:00 ja que és el límit sol·licitat)
+        if (hour < 23) {
+          const opt30 = document.createElement('option');
+          opt30.value = `${hourStr}:30`;
+          opt30.textContent = `${hourStr}:30`;
+          timeSelect.appendChild(opt30);
+        }
+      }
+    }
+
+    // Gestionar canvi de visibilitat del selector de data al triar "Altra data..."
+    document.getElementById('input-task-date-select').addEventListener('change', function() {
+      const otherDateContainer = document.getElementById('other-date-container');
+      if (this.value === 'other') {
+        otherDateContainer.classList.remove('hidden');
+        // Posar la data d'avui com a defecte al calendari picker
+        document.getElementById('input-task-date-picker').value = new Date().toISOString().split('T')[0];
+      } else {
+        otherDateContainer.classList.add('hidden');
+      }
+    });
+
+    // Simulació de sincro amb el núvol
+    function toggleCloudSync() {
+      const cloudIcon = document.getElementById('cloud-icon');
+      showToast("Sincronitzant dades al núvol...");
+      cloudIcon.className = "fa-solid fa-spinner animate-spin text-teal-400";
+      setTimeout(() => {
+        cloudIcon.className = "fa-solid fa-cloud-arrow-up text-emerald-400";
+        showToast("Dades desades correctament!");
+      }, 1500);
+    }
+
+    function openPromptModal(title, desc, defaultValue, callback) {
+      document.getElementById('prompt-modal-title').innerText = title;
+      document.getElementById('prompt-modal-desc').innerText = desc;
+      document.getElementById('prompt-modal-input').value = defaultValue;
+      document.getElementById('custom-prompt-modal').classList.remove('hidden');
+      promptCallback = callback;
+    }
+
+    function closePromptModal() {
+      document.getElementById('custom-prompt-modal').classList.add('hidden');
+    }
+
+    document.getElementById('prompt-modal-submit').addEventListener('click', () => {
+      const value = document.getElementById('prompt-modal-input').value;
+      if (promptCallback) promptCallback(value);
+      closePromptModal();
+    });
+
+    function openConfirmModal(title, desc, callback) {
+      document.getElementById('confirm-modal-title').innerText = title;
+      document.getElementById('confirm-modal-desc').innerText = desc;
+      document.getElementById('custom-confirm-modal').classList.remove('hidden');
+      confirmCallback = callback;
+    }
+
+    function closeConfirmModal() {
+      document.getElementById('custom-confirm-modal').classList.add('hidden');
+    }
+
+    document.getElementById('custom-confirm-modal').querySelectorAll('button')[1].addEventListener('click', () => {
+      if (confirmCallback) confirmCallback();
+      closeConfirmModal();
+    });
+
+    function formatTime(totalSeconds) {
+      const hrs = Math.floor(totalSeconds / 3600).toString().padStart(2, '0');
+      const mins = Math.floor((totalSeconds % 3600) / 60).toString().padStart(2, '0');
+      const secs = (totalSeconds % 60).toString().padStart(2, '0');
+      return `${hrs}:${mins}:${secs}`;
+    }
+
+    // Tradueix la data a un dia de la setmana abreujat per agrupar-lo al gràfic
+    function getDayKeyFromDate(dateString) {
+      const date = new Date(dateString);
+      const days = ['Dg', 'Dl', 'Dm', 'Dc', 'Dj', 'Dv', 'Ds'];
+      return days[date.getDay()];
+    }
+
+    function updateStatisticsView() {
+      let totalSumSeconds = 0;
+      Object.keys(statsDailySeconds).forEach(day => {
+        totalSumSeconds += statsDailySeconds[day];
+      });
+
+      // Total d'hores en format HH:MM:SS
+      document.getElementById('stats-weekly-hours-total').innerText = formatTime(totalSumSeconds);
+
+      // Actualitzar l'offset del cercle de progrés
+      const maxTargetSeconds = 10 * 3600; // Objectiu setmanal: 10 hores
+      const percent = Math.min((totalSumSeconds / maxTargetSeconds) * 100, 100);
+      const circleOffset = 376.8 - (376.8 * percent) / 100;
+      document.getElementById('stats-circle-progress').style.strokeDashoffset = circleOffset;
+
+      // Actualització dinàmica de l'altura dels diagrames de barra en funció dels segons
+      const maxBarHeight = 10800; 
+      Object.keys(statsDailySeconds).forEach(day => {
+        const seconds = statsDailySeconds[day];
+        const barElement = document.getElementById(`bar-${day}`);
+        if (barElement) {
+          const calculatedHeightPercent = Math.max((seconds / maxBarHeight) * 100, 5); // Almenys 5% perquè es vegi
+          barElement.style.height = `${Math.min(calculatedHeightPercent, 100)}%`;
+          barElement.title = `${day === 'Dl' ? 'Dilluns' : day === 'Dm' ? 'Dimarts' : day === 'Dc' ? 'Dimecres' : day === 'Dj' ? 'Dijous' : day === 'Dv' ? 'Divendres' : day === 'Ds' ? 'Dissabte' : 'Diumenge'}: ${formatTime(seconds)}`;
+        }
+      });
+    }
+
+    // Control d'inici/pausa manual de cronòmetres
+    function toggleTimer(taskId) {
+      const task = tasks[taskId];
+      if (!task) return;
+
+      const btn = document.getElementById(`btn-timer-${taskId}`);
+      const display = document.getElementById(`timer-display-${taskId}`);
+
+      if (task.running) {
+        // Pausar
+        clearInterval(task.timerInterval);
+        task.running = false;
+        if (btn) {
+          btn.innerHTML = `<i class="fa-solid fa-play text-[10px]"></i> Inici`;
+          btn.className = "bg-teal-500 hover:bg-teal-400 text-slate-950 font-bold px-4 py-1.5 rounded-xl text-xs flex items-center gap-1 transition shadow shadow-teal-500/10";
+        }
+        showToast(`Activitat "${task.title}" pausada.`);
+      } else {
+        // Iniciar
+        task.running = true;
+        if (btn) {
+          btn.innerHTML = `<i class="fa-solid fa-pause text-[10px]"></i> Pausa`;
+          btn.className = "bg-rose-500 hover:bg-rose-400 text-white font-bold px-4 py-1.5 rounded-xl text-xs flex items-center gap-1 transition shadow shadow-rose-500/10";
+        }
+        showToast(`Cronòmetre de "${task.title}" actiu!`);
+        
+        task.timerInterval = setInterval(() => {
+          task.seconds++;
+          if (display) {
+            display.innerText = formatTime(task.seconds);
+          }
+        }, 1000);
+      }
+    }
+
+    // Reiniciar temps manualment
+    function resetTimer(taskId) {
+      const task = tasks[taskId];
+      if (!task) return;
+      
+      if (task.running) {
+        toggleTimer(taskId); // Pausar abans
+      }
+      task.seconds = 0;
+      const display = document.getElementById(`timer-display-${taskId}`);
+      if (display) {
+        display.innerText = "00:00:00";
+      }
+      showToast("Temps reiniciat!");
+    }
+
+    function toggleTaskStyle(taskId) {
+      const task = tasks[taskId];
+      if (!task) return;
+      
+      const isChecked = document.getElementById(`check-${taskId}`).checked;
+      task.completed = isChecked;
+      const titleElem = document.getElementById(`title-${taskId}`);
+
+      // Aturar el cronòmetre si està actiu al marcar-se com a fet
+      if (task.running) {
+        toggleTimer(taskId);
+      }
+
+      const dayKey = getDayKeyFromDate(task.date);
+
+      if (isChecked) {
+        if (titleElem) {
+          titleElem.classList.add('line-through', 'text-slate-500');
+        }
+        // Sumar els segons transcorreguts directament a la data de la tasca en les estadístiques
+        statsDailySeconds[dayKey] = (statsDailySeconds[dayKey] || 0) + task.seconds;
+        updateStatisticsView();
+        showToast(`Excel·lent! S'han sumat ${formatTime(task.seconds)} al teu gràfic.`);
+      } else {
+        if (titleElem) {
+          titleElem.classList.remove('line-through', 'text-slate-500');
+        }
+        // Restar els segons transcorreguts per si l'usuari desmarca la tasca per accident
+        statsDailySeconds[dayKey] = Math.max((statsDailySeconds[dayKey] || 0) - task.seconds, 0);
+        updateStatisticsView();
+        showToast(`Tasca desmarcada. S'ha restat el temps acumulat.`);
+      }
+    }
+
+    function deleteTask(taskId) {
+      const task = tasks[taskId];
+      if (task) {
+        if (task.timerInterval) {
+          clearInterval(task.timerInterval);
+        }
+        // Si estava marcada com a completada, restem de les estadístiques abans d'eliminar per complet
+        if (task.completed) {
+          const dayKey = getDayKeyFromDate(task.date);
+          statsDailySeconds[dayKey] = Math.max((statsDailySeconds[dayKey] || 0) - task.seconds, 0);
+          updateStatisticsView();
+        }
+        delete tasks[taskId];
+      }
+      
+      const taskElem = document.getElementById(`task-${taskId}`);
+      if (taskElem) {
+        taskElem.remove();
+      }
+      updateTaskCount();
+      showToast("Tasca eliminada del tauler.");
+    }
+
+    // Netejar les tasques completades
+    function clearCompletedTasks() {
+      let cleaned = false;
+      Object.keys(tasks).forEach(id => {
+        if (tasks[id].completed) {
+          deleteTask(id);
+          cleaned = true;
+        }
+      });
+      if (cleaned) {
+        showToast("S'han esborrat les tasques finalitzades.");
+      } else {
+        showToast("No hi ha cap tasca completada per netejar.");
+      }
+    }
+
+    function updateTaskCount() {
+      const count = Object.keys(tasks).length;
+      document.getElementById('task-count').innerText = count;
+    }
+
+    // Navegació de Pestanyes de l'App mòbil
+    function switchTab(targetTab) {
+      const tabs = ['tareas', 'objetivos', 'notas', 'estadisticas', 'ajustes'];
+      tabs.forEach(tab => {
+        document.getElementById(`view-${tab}`).classList.add('hidden');
+        
+        const btn = document.getElementById(`nav-btn-${tab}`);
+        btn.className = "flex flex-col items-center justify-center gap-1 text-slate-500 hover:text-slate-300 transition transform active:scale-90";
+        document.getElementById(`icon-container-${tab}`).classList.remove('bg-teal-500/10');
+      });
+
+      document.getElementById(`view-${targetTab}`).classList.remove('hidden');
+      
+      const activeBtn = document.getElementById(`nav-btn-${targetTab}`);
+      activeBtn.className = "flex flex-col items-center justify-center gap-1 text-teal-400 transition transform active:scale-90";
+      document.getElementById(`icon-container-${targetTab}`).classList.add('bg-teal-500/10');
+    }
+
+    function getSelectedDateISO(dateValue) {
+      const now = new Date();
+      if (dateValue === 'today') {
+        return now.toISOString().split('T')[0];
+      } else if (dateValue === 'tomorrow') {
+        now.setDate(now.getDate() + 1);
+        return now.toISOString().split('T')[0];
+      }
+      return now.toISOString().split('T')[0];
+    }
+
+    function openAddTaskModal(rescheduleTaskId = null) {
+      // 1. Omplir selector de noms amb la llista actual de tasques dels ajustos
+      const selectName = document.getElementById('input-task-name');
+      selectName.innerHTML = customTasksList.map(task => `<option value="${task}">${task}</option>`).join('');
+      
+      // 2. Omplir de manera dinàmica el llistat de categories/etiquetes actualitzable
+      populateTagsSelect();
+
+      const hiddenInput = document.getElementById('input-task-id-hidden');
+      const submitBtn = document.getElementById('task-submit-btn');
+      const titleLabel = document.getElementById('modal-task-title');
+
+      if (rescheduleTaskId) {
+        // Mode edició / reprogramació
+        const task = tasks[rescheduleTaskId];
+        hiddenInput.value = rescheduleTaskId;
+        selectName.value = task.title;
+        document.getElementById('input-task-desc').value = task.desc;
+        
+        // Verificar i establir etiqueta correcta
+        document.getElementById('input-task-tag').value = customTagsList.includes(task.tag) ? task.tag : customTagsList[0];
+        titleLabel.innerText = "Reprogramar Tasca FOCUS";
+        submitBtn.innerHTML = `<i class="fa-solid fa-clock-rotate-left"></i> Desades i Reprogramar`;
+        
+        // Sincronitzar selectors de dates
+        const dateSelect = document.getElementById('input-task-date-select');
+        const datePickerContainer = document.getElementById('other-date-container');
+        const todayStr = new Date().toISOString().split('T')[0];
+        const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 1);
+        const tomorrowStr = tomorrow.toISOString().split('T')[0];
+
+        if (task.date === todayStr) {
+          dateSelect.value = "today";
+          datePickerContainer.classList.add('hidden');
+        } else if (task.date === tomorrowStr) {
+          dateSelect.value = "tomorrow";
+          datePickerContainer.classList.add('hidden');
+        } else {
+          dateSelect.value = "other";
+          datePickerContainer.classList.remove('hidden');
+          document.getElementById('input-task-date-picker').value = task.date;
+        }
+        document.getElementById('input-task-time-select').value = task.time;
+      } else {
+        // Mode creació habitual
+        hiddenInput.value = "";
+        document.getElementById('task-form').reset();
+        document.getElementById('input-task-date-select').value = "today";
+        document.getElementById('other-date-container').classList.add('hidden');
+        titleLabel.innerText = "Nova Tasca FOCUS";
+        submitBtn.innerHTML = `<i class="fa-regular fa-calendar-check text-lg"></i> Desar i Planificar`;
+      }
+
+      document.getElementById('add-task-modal').classList.remove('hidden');
+    }
+
+    function closeAddTaskModal() {
+      document.getElementById('add-task-modal').classList.add('hidden');
+      document.getElementById('task-form').reset();
+    }
+
+    function showReprogramNotification(taskId) {
+      const task = tasks[taskId];
+      if (!task) return;
+
+      const panel = document.getElementById('reprogram-notification');
+      document.getElementById('reprogram-task-name').innerText = `"${task.title}" (Comença ARA)`;
+      
+      const actionBtn = document.getElementById('reprogram-btn-action');
+      actionBtn.onclick = function() {
+        if (task.running) {
+          toggleTimer(taskId);
+        }
+        panel.classList.add('hidden');
+        openAddTaskModal(taskId);
+      };
+
+      panel.classList.remove('hidden');
+      setTimeout(() => {
+        panel.classList.add('hidden');
+      }, 8000);
+    }
+
+    function closeReprogramNotification() {
+      document.getElementById('reprogram-notification').classList.add('hidden');
+    }
+
+    function createNewTask(event) {
+      event.preventDefault();
+
+      const idHidden = document.getElementById('input-task-id-hidden').value;
+      const name = document.getElementById('input-task-name').value;
+      const desc = document.getElementById('input-task-desc').value;
+      const dateSelectVal = document.getElementById('input-task-date-select').value;
+      const time = document.getElementById('input-task-time-select').value;
+      const tag = document.getElementById('input-task-tag').value;
+      
+      let date;
+      if (dateSelectVal === 'other') {
+        date = document.getElementById('input-task-date-picker').value;
+        if (!date) {
+          showToast("Si us plau, tria una data correcta!");
+          return;
+        }
+      } else {
+        date = getSelectedDateISO(dateSelectVal);
+      }
+
+      if (idHidden) {
+        // Cas: Reprogramació de la tasca actual
+        const task = tasks[idHidden];
+        task.title = name;
+        task.desc = desc;
+        task.date = date;
+        task.time = time;
+        task.tag = tag;
+
+        // Re-pintar la fitxa del DOM existent
+        const titleEl = document.getElementById(`title-${idHidden}`);
+        if (titleEl) titleEl.innerText = name;
+        const taskNode = document.getElementById(`task-${idHidden}`);
+        if (taskNode) {
+          const descEl = taskNode.querySelector('p');
+          if (descEl) descEl.innerText = desc;
+          const labelElements = taskNode.querySelectorAll('span');
+          if (labelElements[0]) labelElements[0].innerText = tag;
+          if (labelElements[1]) labelElements[1].innerHTML = `<i class="fa-regular fa-calendar"></i> ${date.split('-').reverse().join('/')} <i class="fa-regular fa-clock ml-1"></i> ${time}`;
+        }
+        
+        closeAddTaskModal();
+        showToast("Tasca reprogramada correctament!");
+        
+        if (!task.running) {
+          toggleTimer(idHidden);
+        }
+        showReprogramNotification(idHidden);
+        return;
+      }
+
+      // Cas: Nova Tasca habitual
+      const id = 'task_' + Date.now();
+
+      tasks[id] = {
+        id: id,
+        title: name,
+        desc: desc,
+        tag: tag,
+        date: date,
+        time: time,
+        seconds: 0,
+        running: false,
+        timerInterval: null,
+        completed: false
+      };
+
+      const dateFormatted = date.split('-').reverse().join('/');
+      // Enllaç ràpid per a integració Google Calendar (Programació Automàtica)
+      const startDate = date.replace(/-/g, '') + 'T' + time.replace(/:/g, '') + '00';
+      const [hours, minutes] = time.split(':');
+      const endHours = (parseInt(hours) + 1).toString().padStart(2, '0');
+      const endDate = date.replace(/-/g, '') + 'T' + endHours + minutes + '00';
+      const calUrl = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(name)}&dates=${startDate}/${endDate}&details=${encodeURIComponent(desc)}`;
+
+      // Inserir al tauler de tasques
+      const taskHtml = `
+        <div class="bg-slate-900/80 border border-slate-800 rounded-3xl p-5 space-y-4 transition-all animate-fade-in" id="task-${id}">
+          <div class="flex justify-between items-start">
+            <div class="flex items-center gap-3">
+              <input type="checkbox" id="check-${id}" class="w-5 h-5 rounded-lg border-slate-700 bg-slate-800 text-teal-500 focus:ring-teal-500 focus:ring-offset-slate-900" onchange="toggleTaskStyle('${id}')">
+              <div>
+                <h4 class="font-bold text-base text-slate-100" id="title-${id}">${name}</h4>
+                <p class="text-xs text-slate-400">${desc}</p>
+                <a href="${calUrl}" target="_blank" class="inline-flex items-center gap-1.5 mt-2 text-[10px] bg-blue-500/20 text-blue-400 font-bold px-2.5 py-1 rounded-lg border border-blue-500/30 hover:bg-blue-500/40 transition">
+                  <i class="fa-regular fa-calendar-plus text-xs"></i> Desar al Google Calendar
+                </a>
+              </div>
+            </div>
+            <div class="flex items-center gap-2">
+              <button onclick="resetTimer('${id}')" class="text-slate-500 hover:text-slate-300 transition text-sm">
+                <i class="fa-solid fa-rotate-right"></i>
+              </button>
+              <button onclick="deleteTask('${id}')" class="text-slate-500 hover:text-rose-400 transition text-sm">
+                <i class="fa-solid fa-trash-can"></i>
+              </button>
+            </div>
+          </div>
+
+          <div class="flex justify-between items-center pt-2 border-t border-slate-800/60">
+            <div class="flex gap-2">
+              <span class="bg-teal-500/10 text-teal-400 text-[10px] font-bold px-2.5 py-1 rounded-lg border border-teal-500/20">${tag}</span>
+              <span class="bg-slate-800 text-slate-300 text-[10px] font-bold px-2.5 py-1 rounded-lg flex items-center gap-1">
+                <i class="fa-regular fa-calendar"></i> ${dateFormatted} <i class="fa-regular fa-clock ml-1"></i> ${time}
+              </span>
+            </div>
+            <div class="flex items-center gap-3">
+              <span class="text-sm font-mono font-bold text-slate-300" id="timer-display-${id}">00:00:00</span>
+              <button id="btn-timer-${id}" onclick="toggleTimer('${id}')" class="bg-teal-500 hover:bg-teal-400 text-slate-950 font-bold px-4 py-1.5 rounded-xl text-xs flex items-center gap-1 transition shadow shadow-teal-500/10">
+                <i class="fa-solid fa-play text-[10px]"></i> Inici
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
+
+      document.getElementById('tasks-list').insertAdjacentHTML('beforeend', taskHtml);
+      updateTaskCount();
+      closeAddTaskModal();
+      showToast("Tasca desada i planificada correctament!");
+
+      setTimeout(() => {
+        toggleTimer(id);
+        showReprogramNotification(id);
+      }, 300);
+    }
+
+    function renderObjectivesList() {
+      const container = document.getElementById('objectives-list');
+      if (!container) return;
+
+      container.innerHTML = objectives.map(obj => {
+        // Càlcul de progés de les 5 subactivitats d'aquest objectiu
+        const totalSubtasks = 5;
+        const completedSubtasksCount = obj.tasks.filter(s => s.completed).length;
+        const progressPercentage = Math.round((completedSubtasksCount / totalSubtasks) * 100);
+        
+        // Comprovar si tot l'objectiu està complet
+        obj.completed = (completedSubtasksCount === totalSubtasks);
+        obj.status = obj.completed 
+          ? "Completat amb èxit! 🎉" 
+          : `En progrés (${completedSubtasksCount} de 5 fetes - ${progressPercentage}%)`;
+
+        const opacityClass = obj.completed ? 'border-teal-500/60 bg-teal-950/10' : 'border-slate-800 bg-slate-900/50';
+
+        // Generar llista HTML per a les 5 subactivitats
+        let subtasksListHtml = '';
+        for (let i = 0; i < 5; i++) {
+          const sub = obj.tasks[i] || { name: customTasksList[0] || "Tasca", completed: false, date: "" };
+          const checkedAttr = sub.completed ? 'checked' : '';
+          
+          // Crear un desplegable amb les tasques d'ajustos per escollir l'activitat
+          let selectOptions = customTasksList.map(task => {
+            const isSelected = sub.name === task ? 'selected' : '';
+            return `<option value="${task}" ${isSelected}>${task}</option>`;
+          }).join('');
+
+          // Si el nom seleccionat no és a la llista d'ajustos, l'afegim com a opció
+          if (!customTasksList.includes(sub.name)) {
+            selectOptions = `<option value="${sub.name}" selected>${sub.name}</option>` + selectOptions;
+          }
+
+          subtasksListHtml += `
+            <div class="flex items-center justify-between gap-3 bg-slate-950/80 p-2.5 rounded-xl border border-slate-800">
+              <div class="flex-1 min-w-0">
+                <span class="text-[9px] text-slate-500 block uppercase tracking-wider">Tasca elegible ${i+1}</span>
+                <select onchange="updateObjectiveSubtaskName('${obj.id}', ${i}, this.value)" class="bg-transparent text-xs text-slate-200 focus:outline-none w-full font-bold cursor-pointer">
+                  ${selectOptions}
+                </select>
+              </div>
+              <div class="flex flex-col items-end shrink-0 gap-1">
+                <div class="flex items-center gap-1.5">
+                  ${sub.completed && sub.date ? `<span class="text-[8px] font-mono bg-emerald-500/10 text-emerald-400 px-1.5 py-0.5 rounded border border-emerald-500/20">${sub.date}</span>` : ''}
+                  <input type="checkbox" ${checkedAttr} onchange="toggleObjectiveSubtask('${obj.id}', ${i}, this.checked)" class="w-4 h-4 rounded border-slate-700 bg-slate-800 text-teal-500 focus:ring-teal-500">
+                </div>
+              </div>
+            </div>
+          `;
+        }
+
+        // Generar els 5 mini segments visuals per a la barra de sota
+        let segmentsHtml = '';
+        for (let i = 0; i < 5; i++) {
+          const isDone = obj.tasks[i] && obj.tasks[i].completed;
+          const bgSegment = isDone ? 'bg-teal-400 shadow shadow-teal-400/50' : 'bg-slate-800 border-r border-slate-900/60';
+          segmentsHtml += `<div class="${bgSegment} h-full transition-all duration-300 rounded-sm" title="Segment ${i+1}"></div>`;
+        }
+
+        return `
+          <div class="border rounded-3xl p-5 space-y-4 shadow-lg transition-all ${opacityClass}" id="obj-card-${obj.id}">
+            <div class="flex justify-between items-start">
+              <div class="flex items-center gap-3">
+                <div class="${obj.bg || 'bg-teal-500/20'} ${obj.color || 'text-teal-400'} p-2.5 rounded-xl text-sm">
+                  <i class="fa-solid ${obj.icon || 'fa-star'}"></i>
+                </div>
+                <div>
+                  <h4 class="font-extrabold text-base text-slate-100">${obj.text}</h4>
+                  <p class="text-xs text-slate-400">${obj.status}</p>
+                </div>
+              </div>
+              <button onclick="removeObjective('${obj.id}')" class="text-slate-500 hover:text-rose-400 transition text-sm p-1">
+                <i class="fa-solid fa-trash-can"></i>
+              </button>
+            </div>
+
+            <!-- BARRA DIVIDIDA HORITZONTALMENT: -->
+            <!-- 1. Part d'alt: Objectiu General -->
+            <div class="space-y-1 bg-slate-950/40 p-3 rounded-2xl border border-slate-800/40">
+              <div class="flex justify-between items-center text-[10px] text-slate-400 font-bold uppercase tracking-wider">
+                <span>Objectiu General</span>
+                <span class="${obj.completed ? 'text-teal-400' : 'text-slate-300'}">${progressPercentage}%</span>
+              </div>
+              <div class="w-full bg-slate-800 rounded-full h-2.5 overflow-hidden">
+                <div class="bg-gradient-to-r from-teal-500 to-emerald-400 h-2.5 rounded-full transition-all duration-500" style="width: ${progressPercentage}%"></div>
+              </div>
+
+              <!-- 2. Part d'abaix: Dividida en 5 parts (tasques) -->
+              <div class="pt-2">
+                <div class="text-[8px] text-slate-500 font-bold uppercase tracking-widest mb-1">Estat de les 5 Activitats</div>
+                <div class="grid grid-cols-5 gap-1.5 h-2 rounded overflow-hidden">
+                  ${segmentsHtml}
+                </div>
+              </div>
+            </div>
+
+            <!-- Desplegable d'activitats editables amb marca feta i data/hora -->
+            <div class="space-y-2 pt-2">
+              <div class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Planificació de Tasques:</div>
+              <div class="grid grid-cols-1 gap-2">
+                ${subtasksListHtml}
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      updateObjectivesProgress();
+    }
+
+    function updateObjectiveSubtaskName(objId, subtaskIndex, value) {
+      const obj = objectives.find(o => o.id === objId);
+      if (obj) {
+        if (!obj.tasks[subtaskIndex]) {
+          obj.tasks[subtaskIndex] = { name: value, completed: false, date: "" };
+        } else {
+          obj.tasks[subtaskIndex].name = value;
+        }
+        showToast("Nom de la subactivitat assignat!");
+        renderObjectivesList();
+      }
+    }
+
+    function toggleObjectiveSubtask(objId, subtaskIndex, isChecked) {
+      const obj = objectives.find(o => o.id === objId);
+      if (obj) {
+        const sub = obj.tasks[subtaskIndex];
+        if (sub) {
+          sub.completed = isChecked;
+          if (isChecked) {
+            const now = new Date();
+            const day = now.getDate().toString().padStart(2, '0');
+            const month = (now.getMonth() + 1).toString().padStart(2, '0');
+            const hours = now.getHours().toString().padStart(2, '0');
+            const minutes = now.getMinutes().toString().padStart(2, '0');
+            sub.date = `${day}/${month} ${hours}:${minutes}`;
+          } else {
+            sub.date = "";
+          }
+        }
+        
+        renderObjectivesList();
+        
+        const allDone = obj.tasks.every(s => s.completed);
+        if (allDone) {
+          showToast(`Felicitats! L'objectiu general "${obj.text}" s'ha assolit! 🏆`);
+        } else {
+          showToast("Progrés de l'objectiu actualitzat!");
+        }
+      }
+    }
+
+    function removeObjective(objId) {
+      objectives = objectives.filter(o => o.id !== objId);
+      renderObjectivesList();
+      showToast("Objectiu eliminat del tauler.");
+    }
+
+    function addObjectiuFromSettings() {
+      const customTitle = document.getElementById('input-new-custom-objective-text').value.trim();
+      const select = document.getElementById('select-objectiu-plantilla');
+      const text = select.value;
+      
+      const objectiveText = customTitle !== '' ? customTitle : text;
+
+      if (!objectiveText) {
+        showToast("No s'ha definit cap títol per a l'objectiu.");
+        return;
+      }
+
+      // Evitar duplicats
+      if (objectives.some(o => o.text === objectiveText)) {
+        showToast("Aquest objectiu ja és actiu al teu tauler!");
+        return;
+      }
+
+      const id = 'obj_' + Date.now();
+      let icon = "fa-star";
+      let color = "text-teal-400";
+      let bg = "bg-teal-500/20";
+
+      if (objectiveText.toLowerCase().includes("estudi") || objectiveText.toLowerCase().includes("mòbil") || objectiveText.toLowerCase().includes("examen")) {
+        icon = "fa-graduation-cap";
+        color = "text-purple-400";
+        bg = "bg-purple-500/20";
+      } else if (objectiveText.toLowerCase().includes("gimnàs") || objectiveText.toLowerCase().includes("córrer") || objectiveText.toLowerCase().includes("esport")) {
+        icon = "fa-dumbbell";
+        color = "text-amber-400";
+        bg = "bg-amber-500/20";
+      } else if (objectiveText.toLowerCase().includes("aigua") || objectiveText.toLowerCase().includes("beure") || objectiveText.toLowerCase().includes("salut")) {
+        icon = "fa-droplet";
+        color = "text-sky-400";
+        bg = "bg-sky-500/20";
+      }
+
+      // Generar les 5 subactivitats buides/defecte basat en customTasksList
+      const subtasks = Array.from({ length: 5 }, (_, idx) => {
+        const taskName = customTasksList[idx % customTasksList.length] || "Tasques d'estudi";
+        return {
+          name: taskName,
+          completed: false,
+          date: ""
+        };
+      });
+
+      objectives.push({
+        id: id,
+        text: objectiveText,
+        completed: false,
+        status: "Pendent (Inicia el repte)",
+        icon: icon,
+        color: color,
+        bg: bg,
+        tasks: subtasks
+      });
+
+      document.getElementById('input-new-custom-objective-text').value = '';
+      renderObjectivesList();
+      showToast("Objectiu afegit amb les seves 5 sub-activitats!");
+    }
+
+    function updateObjectivesProgress() {
+      const total = objectives.length;
+      if (total === 0) {
+        document.getElementById('objectives-progress-bar').style.width = `0%`;
+        document.getElementById('objectives-percentage-text').innerText = "0 de 0 objectius completats (0%)";
+        return;
+      }
+      const completed = objectives.filter(o => o.completed).length;
+      const percent = Math.round((completed / total) * 100);
+
+      document.getElementById('objectives-progress-bar').style.width = `${percent}%`;
+      document.getElementById('objectives-percentage-text').innerText = `${completed} de ${total} objectius completats (${percent}%)`;
+    }
+
+    function renderSettingsLists() {
+      // 1. Pintar llista de Tasques Disponibles
+      const tasksContainer = document.getElementById('custom-tasks-container');
+      if (tasksContainer) {
+        tasksContainer.innerHTML = customTasksList.map((task, index) => `
+          <span class="bg-slate-800 border border-slate-700 text-slate-300 text-[10px] px-2.5 py-1.5 rounded-lg flex items-center gap-2 font-bold">
+            ${task} <i class="fa-solid fa-xmark cursor-pointer hover:text-rose-400 transition" onclick="removeCustomTask(${index})"></i>
+          </span>
+        `).join('');
+      }
+      
+      // 2. Pintar llista d'Objectius de Plantilla
+      const objectivesContainer = document.getElementById('custom-objectives-container');
+      if (objectivesContainer) {
+        objectivesContainer.innerHTML = customObjectivesTemplates.map((obj, index) => `
+          <span class="bg-slate-800 border border-slate-700 text-slate-300 text-[10px] px-2.5 py-1.5 rounded-lg flex items-center gap-2 font-bold">
+            ${obj} <i class="fa-solid fa-xmark cursor-pointer hover:text-rose-400 transition" onclick="removeCustomObjectiveTemplate(${index})"></i>
+          </span>
+        `).join('');
+      }
+
+      // 3. Pintar llista d'Activitats Pendents
+      const activitiesContainer = document.getElementById('custom-activities-container');
+      if (activitiesContainer) {
+        activitiesContainer.innerHTML = customActivitiesList.map((act, index) => `
+          <span class="bg-slate-800 border border-slate-700 text-slate-300 text-[10px] px-2.5 py-1.5 rounded-lg flex items-center gap-2 font-bold">
+            ${act} <i class="fa-solid fa-xmark cursor-pointer hover:text-rose-400 transition" onclick="removeCustomActivity(${index})"></i>
+          </span>
+        `).join('');
+      }
+
+      // 4. Pintar llista de categories/etiquetes
+      const tagsContainer = document.getElementById('custom-tags-container');
+      if (tagsContainer) {
+        tagsContainer.innerHTML = customTagsList.map((tag, index) => `
+          <span class="bg-slate-800 border border-slate-700 text-slate-300 text-[10px] px-2.5 py-1.5 rounded-lg flex items-center gap-2 font-bold">
+            ${tag}
+            <i class="fa-solid fa-pen-to-square cursor-pointer hover:text-teal-400 transition" onclick="editCustomTag(${index})"></i>
+            <i class="fa-solid fa-xmark cursor-pointer hover:text-rose-400 transition" onclick="removeCustomTag(${index})"></i>
+          </span>
+        `).join('');
+      }
+
+      // Re-omplir select d'Objectius de la pestaña d'objectius
+      const selectObjectius = document.getElementById('select-objectiu-plantilla');
+      if (selectObjectius) {
+        selectObjectius.innerHTML = customObjectivesTemplates.map(obj => `<option value="${obj}">${obj}</option>`).join('');
+      }
+
+      renderTables();
+    }
+
+    function addCustomTask() {
+      const input = document.getElementById('new-custom-task');
+      if (input.value.trim() !== '') {
+        customTasksList.push(input.value.trim());
+        input.value = '';
+        renderSettingsLists();
+        renderObjectivesList();
+        showToast("Tasca afegida a la llista de creació.");
+      }
+    }
+
+    function removeCustomTask(index) {
+      customTasksList.splice(index, 1);
+      renderSettingsLists();
+      renderObjectivesList();
+    }
+
+    function addCustomObjectiveFromSettings() {
+      const input = document.getElementById('new-custom-objective');
+      if (input.value.trim() !== '') {
+        customObjectivesTemplates.push(input.value.trim());
+        input.value = '';
+        renderSettingsLists();
+        showToast("Plantilla d'objectiu afegida al llistat.");
+      }
+    }
+
+    function removeCustomObjectiveTemplate(index) {
+      customObjectivesTemplates.splice(index, 1);
+      renderSettingsLists();
+    }
+
+    function addCustomActivity() {
+      const input = document.getElementById('new-custom-activity');
+      if (input.value.trim() !== '') {
+        customActivitiesList.push(input.value.trim());
+        input.value = '';
+        renderSettingsLists();
+        showToast("Activitat afegida a la llista de la taula.");
+      }
+    }
+
+    function removeCustomActivity(index) {
+      customActivitiesList.splice(index, 1);
+      renderSettingsLists();
+    }
+
+    // Gestionar afegit, eliminat i modificat de Categories / Etiquetes
+    function addCustomTag() {
+      const input = document.getElementById('new-custom-tag');
+      const val = input.value.trim();
+      if (val !== '') {
+        if (customTagsList.includes(val)) {
+          showToast("Aquesta categoria ja existeix!");
+          return;
+        }
+        customTagsList.push(val);
+        input.value = '';
+        renderSettingsLists();
+        showToast("Categoria afegida correctament!");
+      }
+    }
+
+    function removeCustomTag(index) {
+      customTagsList.splice(index, 1);
+      renderSettingsLists();
+      showToast("Categoria esborrada.");
+    }
+
+    function editCustomTag(index) {
+      const oldVal = customTagsList[index];
+      openPromptModal("Editar Categoria", "Modifica el nom de la categoria o etiqueta:", oldVal, (newVal) => {
+        if (newVal && newVal.trim() !== '') {
+          customTagsList[index] = newVal.trim();
+          renderSettingsLists();
+          showToast("Categoria modificada amb èxit!");
+        }
+      });
+    }
+
+    function populateTagsSelect() {
+      const select = document.getElementById('input-task-tag');
+      if (!select) return;
+      select.innerHTML = customTagsList.map(tag => `<option value="${tag}">${tag}</option>`).join('');
+    }
+
+    function renderTables() {
+      // 1. Taula Activitats
+      const actBody = document.getElementById('activities-table-body');
+      if (actBody) {
+        actBody.innerHTML = activitiesTableData.map((row, index) => `
+          <tr class="hover:bg-slate-800/40 transition">
+            <td class="px-2 py-1.5">
+              <select class="w-full bg-slate-900 border border-slate-700 rounded p-1.5 text-xs text-slate-200 focus:outline-none focus:border-amber-400 transition" onchange="updateActivityData(${index}, 'activity', this.value)">
+                ${customActivitiesList.map(act => `<option value="${act}" ${row.activity === act ? 'selected' : ''}>${act}</option>`).join('')}
+              </select>
+            </td>
+            <td class="px-2 py-1.5">
+              <input type="text" placeholder="Escriu..." value="${row.obs}" class="w-full bg-slate-900 border border-slate-700 rounded p-1.5 text-xs text-slate-200 focus:outline-none focus:border-amber-400 transition" onchange="updateActivityData(${index}, 'obs', this.value)">
+            </td>
+            <td class="px-2 py-1.5 text-center">
+              <button onclick="removeActivityRow(${index})" class="text-slate-500 hover:text-rose-400 transition bg-slate-800 p-1.5 rounded"><i class="fa-solid fa-trash"></i></button>
+            </td>
+          </tr>
+        `).join('');
+      }
+
+      // 2. Taula Contrasenyes
+      const passBody = document.getElementById('passwords-table-body');
+      if (passBody) {
+        passBody.innerHTML = passwordsTableData.map((row, index) => `
+          <tr class="hover:bg-slate-800/40 transition">
+            <td class="px-2 py-1.5">
+              <input type="text" placeholder="Ex: Web Escola" value="${row.obs}" class="w-full bg-slate-900 border border-slate-700 rounded p-1.5 text-xs text-slate-200 focus:outline-none focus:border-teal-500 transition" onchange="updatePasswordData(${index}, 'obs', this.value)">
+            </td>
+            <td class="px-2 py-1.5">
+              <input type="text" placeholder="Usuari" value="${row.user}" class="w-full bg-slate-900 border border-slate-700 rounded p-1.5 text-xs text-slate-200 focus:outline-none focus:border-teal-500 transition" onchange="updatePasswordData(${index}, 'user', this.value)">
+            </td>
+            <td class="px-2 py-1.5">
+              <input type="text" placeholder="Clau" value="${row.pass}" class="w-full bg-slate-900 border border-slate-700 rounded p-1.5 text-xs text-slate-200 focus:outline-none focus:border-teal-500 transition" onchange="updatePasswordData(${index}, 'pass', this.value)">
+            </td>
+            <td class="px-2 py-1.5 text-center">
+              <button onclick="removePasswordRow(${index})" class="text-slate-500 hover:text-rose-400 transition bg-slate-800 p-1.5 rounded"><i class="fa-solid fa-trash"></i></button>
+            </td>
+          </tr>
+        `).join('');
+      }
+    }
+
+    function addActivityRow() {
+      activitiesTableData.push({ activity: customActivitiesList[0] || "", obs: "" });
+      renderTables();
+    }
+
+    function removeActivityRow(index) {
+      activitiesTableData.splice(index, 1);
+      renderTables();
+    }
+
+    function updateActivityData(index, field, value) {
+      activitiesTableData[index][field] = value;
+    }
+
+    function addPasswordRow() {
+      passwordsTableData.push({ obs: "", user: "", pass: "" });
+      renderTables();
+    }
+
+    function removePasswordRow(index) {
+      passwordsTableData.splice(index, 1);
+      renderTables();
+    }
+
+    function updatePasswordData(index, field, value) {
+      passwordsTableData[index][field] = value;
+    }
+
+    function openNameModal() {
+      const currentName = document.getElementById('user-display-name').innerText;
+      openPromptModal("Canviar Nom d'Usuari", "Escriu el nou nom de perfil administrador:", currentName, (newName) => {
+        if (newName && newName.trim() !== "") {
+          document.getElementById('user-display-name').innerText = newName;
+          showToast("Nom d'usuari actualitzat amb èxit!");
+        }
+      });
+    }
+
+    function openQuoteModal() {
+      const currentText = document.getElementById('daily-inspiration-text').innerText.replace(/"/g, '');
+      openPromptModal("Canviar Inspiració Diària", "Escriu una frase motivacional personalitzada:", currentText, (newText) => {
+        if (newText && newText.trim() !== "") {
+          document.getElementById('daily-inspiration-text').innerText = `"${newText}"`;
+          showToast("La frase inspiradora ha sigut actualitzada!");
+        }
+      });
+    }
+
+    function exportToExcelCSV(headers, rows, fileName) {
+      // Utilitzar un delimitador compatible com el punt i coma per a l'Excel en català/espanyol
+      let csvContent = "\uFEFF"; // BOM UTF-8 per garantir accents correctes
+      csvContent += headers.join(";") + "\n";
+      
+      rows.forEach(row => {
+        const escapedRow = row.map(val => {
+          let str = (val === null || val === undefined) ? "" : String(val);
+          // Escapar cometes dobles
+          str = str.replace(/"/g, '""');
+          if (str.includes(";") || str.includes("\n") || str.includes('"')) {
+            str = `"${str}"`;
+          }
+          return str;
+        });
+        csvContent += escapedRow.join(";") + "\n";
+      });
+
+      // Crear l'enllaç de descàrrega
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.setAttribute("href", url);
+      link.setAttribute("download", fileName);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+
+    // Exportar Activitats a Excel
+    function exportActivitiesToExcel() {
+      const headers = ["Activitat Seleccionada", "Observacions i Comentaris"];
+      const rows = activitiesTableData.map(row => [row.activity, row.obs]);
+      exportToExcelCSV(headers, rows, "activitats_pendents_focus.csv");
+      showToast("Taula d'Activitats exportada!");
+    }
+
+    // Exportar Contrasenyes a Excel
+    function exportPasswordsToExcel() {
+      const headers = ["Lloc / Obs / Servei", "Nom d'Usuari", "Contrasenya"];
+      const rows = passwordsTableData.map(row => [row.obs, row.user, row.pass]);
+      exportToExcelCSV(headers, rows, "contrasenyes_focus.csv");
+      showToast("Taula de Contrasenyes exportada!");
+    }
+
+    // Exportar Estadístiques de Focus a Excel
+    function exportStatsToExcel() {
+      const headers = ["Dia de la setmana", "Concentració acumulada (Segons)", "Format hores (HH:MM:SS)"];
+      const rows = Object.keys(statsDailySeconds).map(day => {
+        const dayFull = day === 'Dl' ? 'Dilluns' : day === 'Dm' ? 'Dimarts' : day === 'Dc' ? 'Dimecres' : day === 'Dj' ? 'Dijous' : day === 'Dv' ? 'Divendres' : day === 'Ds' ? 'Dissabte' : 'Diumenge';
+        return [dayFull, statsDailySeconds[day], formatTime(statsDailySeconds[day])];
+      });
+
+      // Calcular la fila final del total
+      let totalSumSeconds = 0;
+      Object.keys(statsDailySeconds).forEach(day => { totalSumSeconds += statsDailySeconds[day]; });
+      rows.push(["TOTAL SETMANAL", totalSumSeconds, formatTime(totalSumSeconds)]);
+
+      exportToExcelCSV(headers, rows, "estadistiques_focus_setmanal.csv");
+      showToast("Estadístiques de Focus exportades!");
+    }
+
+    function openResetModal() {
+      openConfirmModal(
+        "Reiniciar dades", 
+        "Estàs segur de voler esborrar totes les tasques, llistes i restablir els comptadors a zero?", 
+        () => {
+          Object.keys(tasks).forEach(id => {
+            if (id !== 'default') {
+              deleteTask(id);
+            } else {
+              resetTimer('default');
+              const checkDefault = document.getElementById('check-default');
+              if (checkDefault) {
+                checkDefault.checked = false;
+                toggleTaskStyle('default');
+              }
+            }
+          });
+          statsDailySeconds = { 'Dl': 12*60, 'Dm': 25*60, 'Dc': 15*60, 'Dj': 18*60, 'Dv': 30*60, 'Ds': 0, 'Dg': 0 };
+          updateStatisticsView();
+
+          objectives = [
+            { 
+              id: 'obj1', 
+              text: "Projecte Final d'FP", 
+              completed: false, 
+              status: "En progrés", 
+              icon: "fa-graduation-cap", 
+              color: "text-teal-400", 
+              bg: "bg-teal-500/20",
+              tasks: [
+                { name: "Preparar examen de Retail", completed: false, date: "" },
+                { name: "Estudiar apunts", completed: true, date: "24/06 14:30" },
+                { name: "Reunió de projecte", completed: false, date: "" },
+                { name: "Llegir llibre de disseny", completed: false, date: "" },
+                { name: "Fer esport", completed: false, date: "" }
+              ]
+            }
+          ];
+          renderObjectivesList();
+
+          document.getElementById('user-display-name').innerText = "Profe FP";
+          document.getElementById('daily-inspiration-text').innerText = `"La concentració és el secret de la força en la política, en la guerra, en el comerç i en tots els aspectes de la vida."`;
+          
+          switchTab('tareas');
+          showToast("L'aplicació s'ha restablit correctament!");
+        }
+      );
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+      populateTimeSelect();
+      renderSettingsLists();
+      renderObjectivesList();
+      updateStatisticsView();
+    });
+  </script>
+</body>
+</html>

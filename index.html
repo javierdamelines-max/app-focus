@@ -4,78 +4,36 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>FOCUS - El teu gestor de productivitat</title>
-
-  <!-- 📱 CONFIGURACIÓ DE LA TEVA PWA (Pas 2) -->
-  <!-- Enllaç al manifest que conté les icones i els colors del mòbil -->
-  <link class="pwa-setup" rel="manifest" href="manifest.json">
+  <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#06b6d4">
-
-  <!-- Registre del Service Worker (perquè l'app funcioni sense connexió a Internet) -->
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        // Fem servir './sw.js' per evitar errors de rutes en servidors gratuïts
         navigator.serviceWorker.register('./sw.js')
-          .then(reg => console.log('Service Worker registrat correctament!', reg))
-          .catch(err => console.error('Error en registrar el Service Worker:', err));
+          .then(reg => console.log('Service Worker registrat!', reg))
+          .catch(err => console.error('Error:', err));
       });
     }
   </script>
-  <!-- ------------------------------------------------------------------ -->
-
-  <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
-  <!-- FontAwesome per a les icones del disseny tipus app de mòbil -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght=300;400;500;600;700;800&display=swap');
-    body {
-      font-family: 'Plus Jakarta Sans', sans-serif;
-    }
-    /* Estilització per a simular una pantalla de mòbil premium si s'obre en escriptori */
-    .app-container {
-      max-width: 480px;
-      min-height: 850px;
-    }
-    /* Scrollbars amagats per a una experiència d'app nativa */
-    .no-scrollbar::-webkit-scrollbar {
-      display: none;
-    }
-    .no-scrollbar {
-      -ms-overflow-style: none;
-      scrollbar-width: none;
-    }
+    body { font-family: 'Plus Jakarta Sans', sans-serif; }
+    .app-container { max-width: 480px; min-height: 850px; }
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
   </style>
 </head>
 <body class="bg-slate-950 text-slate-100 flex justify-center items-center min-h-screen">
-
-  <!-- Contenidor Principal de l'App (Simulador de Mòbil Premium) -->
-  <div class="app-container w-full sm:rounded-[3rem] sm:border-8 sm:border-slate-800 bg-black shadow-2xl relative flex flex-col overflow-hidden sm:ring-4 sm:ring-slate-900">
+  <div class="app-container w-full sm:rounded-[3rem] sm:border-8 sm:border-slate-800 bg-black shadow-2xl relative flex flex-col overflow-hidden">
     
-    <!-- Barra de dalt d'estat del mòbil simulada -->
     <div class="bg-slate-950 px-6 pt-3 pb-1 flex justify-between items-center text-xs text-slate-400 select-none z-20">
       <span class="font-semibold" id="current-time">17:38</span>
       <div class="flex items-center gap-1.5">
         <i class="fa-solid fa-wifi"></i>
         <i class="fa-solid fa-signal"></i>
         <i class="fa-solid fa-battery-full text-teal-400"></i>
-      </div>
-    </div>
-
-    <!-- NOTIFICACIÓ INTERACTIVA DE REPROGRAMACIÓ I AVISOS -->
-    <div id="reprogram-notification" class="hidden absolute top-12 left-4 right-4 bg-gradient-to-r from-teal-500 to-emerald-500 text-slate-950 px-4 py-3.5 rounded-2xl flex flex-col gap-2 shadow-2xl">
-      <div class="flex justify-between items-center">
-        <div class="flex items-center gap-2">
-          <i class="fa-solid fa-play animate-ping text-xs"></i>
-          <span class="text-xs font-black uppercase tracking-wider">Tasca Iniciada Automàticament!</span>
-        </div>
-        <button onclick="closeReprogramNotification()" class="text-slate-950 hover:text-slate-800"><i class="fa-solid fa-xmark"></i></button>
-      </div>
-      <div class="flex justify-between items-center">
-        <p class="text-xs font-medium" id="reprogram-task-name">Nom de la tasca...</p>
-        <button id="reprogram-btn-action" class="bg-slate-950 hover:bg-slate-900 text-teal-400 text-[10px] font-extrabold py-1.5 px-3 rounded-lg shadow transition">
-          <i class="fa-solid fa-clock-rotate-left"></i> Reprogramar
-        </button>
       </div>
     </div>
 
@@ -91,47 +49,20 @@
       </button>
     </header>
 
-    <!-- PANTALLA PRINCIPAL: TASQUES -->
     <main id="view-tareas" class="flex-1 overflow-y-auto no-scrollbar px-5 py-6 space-y-6 pb-24 z-10">
-      
-      <!-- Secció Data i Botó Afegir -->
       <div class="flex justify-between items-center">
         <div>
           <span class="text-xs text-slate-400 uppercase tracking-wider font-semibold">Avui</span>
-          <h2 class="text-xl font-bold flex items-center gap-2 text-slate-200">
-            Dimecres, 24 de juny <i class="fa-regular fa-calendar text-teal-500 text-sm"></i>
-          </h2>
+          <h2 class="text-xl font-bold flex items-center gap-2 text-slate-200">Dimecres, 24 de juny <i class="fa-regular fa-calendar text-teal-500 text-sm"></i></h2>
         </div>
-        <button onclick="openAddTaskModal()" class="bg-teal-500 hover:bg-teal-400 text-slate-950 font-bold px-4 py-2.5 rounded-2xl flex items-center gap-1.5 transition shadow-lg shadow-teal-500/10">
-          <i class="fa-solid fa-plus"></i> Nova
-        </button>
       </div>
 
-      <section class="bg-gradient-to-r from-slate-900 to-slate-950 border border-slate-800 rounded-3xl p-5 space-y-2 relative overflow-hidden shadow-inner">
-        <div class="absolute -right-4 -bottom-4 text-slate-800/10 text-7xl font-bold">
-          <i class="fa-solid fa-quote-right"></i>
-        </div>
+      <section class="bg-gradient-to-r from-slate-900 to-slate-950 border border-slate-800 rounded-3xl p-5 space-y-2">
         <h3 class="text-xs font-bold text-teal-500 uppercase tracking-widest flex items-center gap-2">
           <i class="fa-solid fa-star text-amber-400"></i> Inspiració Diària
         </h3>
-        <p class="text-sm italic text-slate-300 relative z-10" id="daily-inspiration-text">
-          "La concentració és el secret de la força en la política, en la guerra, en el comerç i en tots els aspectes de la vida."
-        </p>
+        <p class="text-sm italic text-slate-300" id="daily-inspiration-text">"La concentració és el secret de la força en tots els aspectes de la vida."</p>
       </section>
-
-      <!-- Navegació de Temps -->
-      <div class="grid grid-cols-3 bg-slate-900/50 p-1.5 rounded-2xl border border-slate-900">
-        <button class="py-2 text-xs font-bold rounded-xl text-teal-400 bg-slate-900 border border-slate-800 shadow" id="tab-dia">Día</button>
-        <button class="py-2 text-xs font-semibold rounded-xl text-slate-400 hover:text-slate-200 transition" id="tab-setmana">Setmana</button>
-        <button class="py-2 text-xs font-semibold rounded-xl text-slate-400 hover:text-slate-200 transition" id="tab-mes">Mes</button>
-      </div>
-
-      <!-- Filtre de Dies -->
-      <div class="flex gap-2">
-        <button class="flex-1 py-2 text-xs font-semibold rounded-xl bg-slate-900/40 text-slate-400 border border-slate-900 hover:bg-slate-900/80 transition">Ahir</button>
-        <button class="flex-1 py-2 text-xs font-bold rounded-xl bg-teal-500/20 text-teal-400 border border-teal-500/30">Avui</button>
-        <button class="flex-1 py-2 text-xs font-semibold rounded-xl bg-slate-900/40 text-slate-400 border border-slate-900 hover:bg-slate-900/80 transition">Demà</button>
-      </div>
 
       <div class="space-y-4">
         <div class="flex justify-between items-center px-1">
@@ -140,36 +71,29 @@
         </div>
 
         <div id="tasks-list" class="space-y-3">
-          <!-- Primera tasca que es carrega per defecte -->
-          <div class="bg-slate-900/80 border border-slate-800 rounded-3xl p-5 space-y-4 transition-all" id="task-default">
+          <div class="bg-slate-900/80 border border-slate-800 rounded-3xl p-5 space-y-4" id="task-default">
             <div class="flex justify-between items-start">
               <div class="flex items-center gap-3">
-                <input type="checkbox" id="check-default" class="w-5 h-5 rounded-lg border-slate-700 bg-slate-800 text-teal-500 focus:ring-teal-500 focus:ring-offset-slate-900" onchange="toggleTaskStyle('default')">
+                <input type="checkbox" id="check-default" class="w-5 h-5 rounded-lg border-slate-700 bg-slate-800 text-teal-500" onchange="toggleTaskStyle('default')">
                 <div>
                   <h4 class="font-bold text-base text-slate-100" id="title-default">Fer esport</h4>
                   <p class="text-xs text-slate-400">Gym habitual de tarda</p>
                 </div>
               </div>
               <div class="flex items-center gap-2">
-                <button onclick="resetTimer('default')" class="text-slate-500 hover:text-slate-300 transition text-sm">
-                  <i class="fa-solid fa-rotate-right"></i>
-                </button>
-                <button onclick="deleteTask('default')" class="text-slate-500 hover:text-rose-400 transition text-sm">
-                  <i class="fa-solid fa-trash-can"></i>
-                </button>
+                <button onclick="resetTimer('default')" class="text-slate-500 hover:text-slate-300 transition text-sm"><i class="fa-solid fa-rotate-right"></i></button>
+                <button onclick="deleteTask('default')" class="text-slate-500 hover:text-rose-400 transition text-sm"><i class="fa-solid fa-trash-can"></i></button>
               </div>
             </div>
 
             <div class="flex justify-between items-center pt-2 border-t border-slate-800/60">
               <div class="flex gap-2">
                 <span class="bg-emerald-500/10 text-emerald-400 text-[10px] font-bold px-2.5 py-1 rounded-lg border border-emerald-500/20">Salut</span>
-                <span class="bg-slate-800 text-slate-300 text-[10px] font-bold px-2.5 py-1 rounded-lg flex items-center gap-1">
-                  <i class="fa-regular fa-clock"></i> 19:00
-                </span>
+                <span class="bg-slate-800 text-slate-300 text-[10px] font-bold px-2.5 py-1 rounded-lg flex items-center gap-1"><i class="fa-regular fa-clock"></i> 19:00</span>
               </div>
               <div class="flex items-center gap-3">
                 <span class="text-sm font-mono font-bold text-slate-300" id="timer-display-default">00:00:03</span>
-                <button id="btn-timer-default" onclick="toggleTimer('default')" class="bg-teal-500 hover:bg-teal-400 text-slate-950 font-bold px-4 py-1.5 rounded-xl text-xs flex items-center gap-1 transition shadow shadow-teal-500/10">
+                <button id="btn-timer-default" onclick="toggleTimer('default')" class="bg-teal-500 hover:bg-teal-400 text-slate-950 font-bold px-4 py-1.5 rounded-xl text-xs flex items-center gap-1 transition">
                   <i class="fa-solid fa-play text-[10px]"></i> Inici
                 </button>
               </div>
@@ -177,105 +101,125 @@
           </div>
         </div>
       </div>
-
     </main>
 
-    <!-- NAVEGACIÓ INFERIOR -->
     <nav class="absolute bottom-0 left-0 right-0 bg-slate-950/95 backdrop-blur border-t border-slate-900 grid grid-cols-5 py-3 px-2 text-center select-none z-20">
-      <button onclick="switchTab('tareas')" id="nav-btn-tareas" class="flex flex-col items-center justify-center gap-1 text-teal-400 transition transform active:scale-90">
-        <div class="p-1 rounded-xl bg-teal-500/10" id="icon-container-tareas">
-          <i class="fa-solid fa-list-check text-lg"></i>
-        </div>
+      <button onclick="switchTab('tareas')" class="flex flex-col items-center justify-center gap-1 text-teal-400 transition transform active:scale-90">
+        <div class="p-1 rounded-xl bg-teal-500/10"><i class="fa-solid fa-list-check text-lg"></i></div>
         <span class="text-[9px] font-bold tracking-wider">Tasques</span>
       </button>
-
-      <button onclick="switchTab('objetivos')" id="nav-btn-objetivos" class="flex flex-col items-center justify-center gap-1 text-slate-500 hover:text-slate-300 transition transform active:scale-90">
-        <div class="p-1 rounded-xl" id="icon-container-objetivos">
-          <i class="fa-solid fa-bullseye text-lg"></i>
-        </div>
+      <button onclick="switchTab('objetivos')" class="flex flex-col items-center justify-center gap-1 text-slate-500 hover:text-slate-300 transition transform active:scale-90">
+        <div class="p-1 rounded-xl"><i class="fa-solid fa-bullseye text-lg"></i></div>
         <span class="text-[9px] font-semibold tracking-wider">Objectius</span>
       </button>
-
-      <button onclick="switchTab('notas')" id="nav-btn-notas" class="flex flex-col items-center justify-center gap-1 text-slate-500 hover:text-slate-300 transition transform active:scale-90">
-        <div class="p-1 rounded-xl" id="icon-container-notas">
-          <i class="fa-regular fa-sticky-note text-lg"></i>
-        </div>
+      <button onclick="switchTab('notas')" class="flex flex-col items-center justify-center gap-1 text-slate-500 hover:text-slate-300 transition transform active:scale-90">
+        <div class="p-1 rounded-xl"><i class="fa-regular fa-sticky-note text-lg"></i></div>
         <span class="text-[9px] font-semibold tracking-wider">Notes</span>
       </button>
-
-      <button onclick="switchTab('estadisticas')" id="nav-btn-estadisticas" class="flex flex-col items-center justify-center gap-1 text-slate-500 hover:text-slate-300 transition transform active:scale-90">
-        <div class="p-1 rounded-xl" id="icon-container-estadisticas">
-          <i class="fa-solid fa-chart-simple text-lg"></i>
-        </div>
+      <button onclick="switchTab('estadisticas')" class="flex flex-col items-center justify-center gap-1 text-slate-500 hover:text-slate-300 transition transform active:scale-90">
+        <div class="p-1 rounded-xl"><i class="fa-solid fa-chart-simple text-lg"></i></div>
         <span class="text-[9px] font-semibold tracking-wider">Estadístiques</span>
       </button>
-
-      <button onclick="switchTab('ajustes')" id="nav-btn-ajustes" class="flex flex-col items-center justify-center gap-1 text-slate-500 hover:text-slate-300 transition transform active:scale-90">
-        <div class="p-1 rounded-xl" id="icon-container-ajustes">
-          <i class="fa-solid fa-sliders text-lg"></i>
-        </div>
+      <button onclick="switchTab('ajustes')" class="flex flex-col items-center justify-center gap-1 text-slate-500 hover:text-slate-300 transition transform active:scale-90">
+        <div class="p-1 rounded-xl"><i class="fa-solid fa-sliders text-lg"></i></div>
         <span class="text-[9px] font-semibold tracking-wider">Ajustos</span>
       </button>
     </nav>
+
+    <div id="toast-notification" class="hidden absolute top-16 left-6 right-6 bg-teal-500 text-slate-950 px-4 py-3.5 rounded-2xl flex items-center gap-3 shadow-lg transition-all duration-300">
+      <i class="fa-solid fa-circle-info text-lg"></i>
+      <span class="text-xs font-bold" id="toast-message">Missatge</span>
+    </div>
   </div>
 
   <script>
-    // Variables i estat global de l'aplicació
-    const tasks = {
-      default: {
-        id: 'default',
-        title: 'Fer esport',
-        desc: 'Gym habitual de tarda',
-        tag: 'Salut',
-        time: '19:00',
-        date: new Date().toISOString().split('T')[0],
-        seconds: 3,
-        running: false,
-        timerInterval: null,
-        completed: false
-      }
-    };
+    const tasks = { default: { id: 'default', title: 'Fer esport', desc: 'Gym habitual de tarda', tag: 'Salut', time: '19:00', date: new Date().toISOString().split('T')[0], seconds: 3, running: false, timerInterval: null, completed: false } };
 
     function updateClock() {
       const now = new Date();
-      let hours = now.getHours().toString().padStart(2, '0');
-      let minutes = now.getMinutes().toString().padStart(2, '0');
-      document.getElementById('current-time').innerText = `${hours}:${minutes}`;
+      document.getElementById('current-time').innerText = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
     }
     setInterval(updateClock, 1000);
     updateClock();
 
-    function switchTab(tab) {
-      console.log('Tab:', tab);
+    function showToast(message) {
+      const toast = document.getElementById('toast-notification');
+      document.getElementById('toast-message').innerText = message;
+      toast.classList.remove('hidden');
+      setTimeout(() => { toast.classList.add('translate-y-0', 'opacity-100'); }, 50);
+      setTimeout(() => { toast.classList.remove('translate-y-0', 'opacity-100'); toast.classList.add('-translate-y-10', 'opacity-0'); setTimeout(() => { toast.classList.add('hidden'); }, 300); }, 3000);
     }
 
-    function openAddTaskModal() {
-      console.log('Add task');
-    }
+    function formatTime(s) { return Math.floor(s/3600).toString().padStart(2, '0') + ':' + Math.floor((s%3600)/60).toString().padStart(2, '0') + ':' + (s%60).toString().padStart(2, '0'); }
 
     function toggleTimer(taskId) {
-      console.log('Toggle timer:', taskId);
+      const task = tasks[taskId];
+      if (!task) return;
+      const btn = document.getElementById('btn-timer-' + taskId);
+      const display = document.getElementById('timer-display-' + taskId);
+      if (task.running) {
+        clearInterval(task.timerInterval);
+        task.running = false;
+        if (btn) { btn.innerHTML = '<i class="fa-solid fa-play text-[10px]"></i> Inici'; btn.className = 'bg-teal-500 hover:bg-teal-400 text-slate-950 font-bold px-4 py-1.5 rounded-xl text-xs flex items-center gap-1 transition'; }
+        showToast('Activitat pausada.');
+      } else {
+        task.running = true;
+        if (btn) { btn.innerHTML = '<i class="fa-solid fa-pause text-[10px]"></i> Pausa'; btn.className = 'bg-rose-500 hover:bg-rose-400 text-white font-bold px-4 py-1.5 rounded-xl text-xs flex items-center gap-1 transition'; }
+        showToast('Cronòmetre actiu!');
+        task.timerInterval = setInterval(() => { task.seconds++; if (display) display.innerText = formatTime(task.seconds); }, 1000);
+      }
     }
 
     function resetTimer(taskId) {
-      console.log('Reset timer:', taskId);
+      const task = tasks[taskId];
+      if (!task) return;
+      if (task.running) toggleTimer(taskId);
+      task.seconds = 0;
+      const display = document.getElementById('timer-display-' + taskId);
+      if (display) display.innerText = '00:00:00';
+      showToast('Temps reiniciat!');
     }
 
     function deleteTask(taskId) {
-      console.log('Delete task:', taskId);
+      const task = tasks[taskId];
+      if (task && task.timerInterval) clearInterval(task.timerInterval);
+      delete tasks[taskId];
+      const taskElem = document.getElementById('task-' + taskId);
+      if (taskElem) taskElem.remove();
+      document.getElementById('task-count').innerText = Object.keys(tasks).length;
+      showToast('Tasca eliminada.');
     }
 
     function toggleTaskStyle(taskId) {
-      console.log('Toggle task style:', taskId);
+      const task = tasks[taskId];
+      if (!task) return;
+      const isChecked = document.getElementById('check-' + taskId).checked;
+      task.completed = isChecked;
+      const titleElem = document.getElementById('title-' + taskId);
+      if (task.running) toggleTimer(taskId);
+      if (isChecked) {
+        if (titleElem) titleElem.classList.add('line-through', 'text-slate-500');
+        showToast('Tasca completada!');
+      } else {
+        if (titleElem) titleElem.classList.remove('line-through', 'text-slate-500');
+        showToast('Tasca desmarcada.');
+      }
     }
 
     function clearCompletedTasks() {
-      console.log('Clear completed');
+      let cleaned = false;
+      Object.keys(tasks).forEach(id => { if (tasks[id].completed) { deleteTask(id); cleaned = true; } });
+      showToast(cleaned ? 'Tasques esborrades.' : 'No hi ha tasques completades.');
     }
 
     function toggleCloudSync() {
-      console.log('Toggle cloud sync');
+      const cloudIcon = document.getElementById('cloud-icon');
+      showToast('Sincronitzant...');
+      cloudIcon.className = 'fa-solid fa-spinner animate-spin text-teal-400';
+      setTimeout(() => { cloudIcon.className = 'fa-solid fa-cloud-arrow-up text-emerald-400'; showToast('Dades desades!'); }, 1500);
     }
+
+    function switchTab(tab) { showToast('Pestanya: ' + tab); }
   </script>
 </body>
 </html>
